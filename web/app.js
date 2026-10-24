@@ -1,6 +1,8 @@
 "use strict";
 const $ = (id) => document.getElementById(id);
 const state = { kind: "eam", rows: [], selected: null, oldest: null };
+// Static build for GitHub Pages (tools/build_pages.py): API responses are JSON files, nothing is live.
+const DEMO = !!window.SKYWATCH_DEMO;
 
 const zTime = (epoch, withDate = true) => {
   const d = new Date(epoch * 1000);
@@ -17,7 +19,7 @@ const live = $("live");
 $("listen").addEventListener("click", () => {
   const btn = $("listen");
   if (live.paused) {
-    live.src = "/live.mp3?t=" + Date.now();     // fresh connection, no stale buffer
+    live.src = "live.mp3?t=" + Date.now();     // fresh connection, no stale buffer
     live.play().catch(() => {});
     btn.setAttribute("aria-pressed", "true");
     $("listen-label").textContent = "Stop";
@@ -29,9 +31,14 @@ $("listen").addEventListener("click", () => {
 });
 
 function renderStatus(s) {
+  const sql = $("sql");
+  if (DEMO) {
+    sql.textContent = "demo"; sql.className = "sql ended";
+    $("src").textContent = "Sample data only. Run Skywatch yourself to monitor 11175 kHz live.";
+    return;
+  }
   $("freq").textContent = s.freq_khz;
   $("mode").textContent = (s.mode || "").toUpperCase();
-  const sql = $("sql");
   const name = (s.host || "").startsWith("file:") ? s.host.slice(5) : s.host;
   if (!s.connected && s.finished) {
     sql.textContent = "ended"; sql.className = "sql ended";
@@ -83,7 +90,8 @@ function renderRows(newId) {
 async function loadRows(append = false) {
   const q = new URLSearchParams({ kind: state.kind, limit: 50 });
   if (append && state.oldest) q.set("before", state.oldest);
-  const rows = await fetch("/api/messages?" + q).then((r) => r.json());
+  const url = DEMO ? `api/messages-${state.kind}.json` : "api/messages?" + q;
+  const rows = await fetch(url).then((r) => r.json());
   state.rows = append ? state.rows.concat(rows) : rows;
   state.oldest = state.rows.length ? state.rows[state.rows.length - 1].id : null;
   $("more").hidden = rows.length < 50;
@@ -140,13 +148,13 @@ function block(title, el) {
 async function select(id) {
   state.selected = id;
   document.querySelectorAll("#rows tr").forEach((tr) => tr.classList.toggle("sel", +tr.dataset.id === id));
-  const m = await fetch(`/api/messages/${id}`).then((r) => r.json());
+  const m = await fetch(DEMO ? `api/messages/${id}.json` : `api/messages/${id}`).then((r) => r.json());
   $("pad-empty").hidden = true;
   $("pad-body").hidden = false;
   const label = { eam: "Emergency Action Message", skyking: "Skyking", voice: "Voice traffic" }[m.kind];
   $("pad-title").textContent = zTime(m.started_at);
   $("pad-meta").textContent = [label, m.callsign && `from ${m.callsign}`, dur(m.duration)].filter(Boolean).join(", ");
-  player.src = `/audio/${m.audio}`;
+  player.src = `audio/${m.audio}`;
 
   const out = $("pad-copy");
   out.innerHTML = "";
@@ -194,7 +202,7 @@ player.addEventListener("timeupdate", () => {
 
 /* ---------- server events ---------- */
 function connectEvents() {
-  const es = new EventSource("/api/events");
+  const es = new EventSource("api/events");
   es.addEventListener("status", (e) => renderStatus(JSON.parse(e.data)));
   es.addEventListener("message", (e) => {
     const m = JSON.parse(e.data);
@@ -205,6 +213,12 @@ function connectEvents() {
   });
 }
 
-fetch("/api/status").then((r) => r.json()).then(renderStatus).catch(() => {});
+if (DEMO) {
+  $("listen").hidden = true;
+  document.querySelector(".meter").hidden = true;
+  renderStatus({});
+} else {
+  fetch("api/status").then((r) => r.json()).then(renderStatus).catch(() => {});
+  connectEvents();
+}
 loadRows();
-connectEvents();

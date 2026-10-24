@@ -40,6 +40,13 @@ python -m pytest -q
 `EAM_SOURCE=file` also takes a real recording (any format ffmpeg reads), which
 is the easiest way to tune the squelch and judge Whisper model size.
 
+## Demo site
+
+Every push to `main` builds a static demo with the sample EAM and Skyking and
+deploys it to GitHub Pages (`.github/workflows/pages.yml`):
+https://zkm.github.io/skywatch/. No live audio there; it only shows the UI.
+Build it locally with `python tools/build_pages.py _site`.
+
 ## How copying works
 
 On-air format (per priyom.org): preamble, first six characters + "stand by" x3,
