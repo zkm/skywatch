@@ -1,5 +1,5 @@
 fastapi>=0.110
 uvicorn[standard]>=0.29
-numpy>=1.26
+numpy>=2.5.4
 faster-whisper>=1.1
 pywebpush>=2.0
