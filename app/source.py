@@ -32,6 +32,7 @@ class SourceState:
         self.host: Optional[str] = None
         self.since: Optional[float] = None
         self.last_error: Optional[str] = None
+        self.finished = False   # file source played to the end and won't loop
 
 
 def _ffmpeg_resample_cmd(rate: int, input_args: list[str]) -> list[str]:
@@ -156,6 +157,7 @@ class FileSource:
                 ff.wait()
                 self.state.connected = False
             if not self.cfg.file_loop:
+                self.state.finished = True
                 return
 
 

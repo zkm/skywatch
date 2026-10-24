@@ -32,14 +32,20 @@ function renderStatus(s) {
   $("freq").textContent = s.freq_khz;
   $("mode").textContent = (s.mode || "").toUpperCase();
   const sql = $("sql");
-  if (!s.connected) {
+  const name = (s.host || "").startsWith("file:") ? s.host.slice(5) : s.host;
+  if (!s.connected && s.finished) {
+    sql.textContent = "ended"; sql.className = "sql ended";
+    $("src").textContent = `Finished playing ${name}. Restart the server to play it again.`;
+  } else if (!s.connected) {
     sql.textContent = "no signal"; sql.className = "sql down";
     $("src").textContent = s.last_error ? `Receiver offline: ${s.last_error}. Retrying.` : "Connecting to receiver…";
   } else {
     sql.textContent = s.squelch_open ? "copying" : "idle";
     sql.className = "sql" + (s.squelch_open ? " open" : "");
-    const busy = s.asr_busy ? " Transcribing…" : "";
-    $("src").textContent = `Receiver ${s.host}. ${s.listeners} listening.${busy}`;
+    const busy = s.asr_busy ? " · transcribing…" : "";
+    const who = s.listeners === 1 ? "1 listener" : `${s.listeners} listeners`;
+    const src = name === s.host ? `Receiver ${name}` : `Playing ${name}`;
+    $("src").textContent = `${src} · ${who}${busy}`;
   }
   // meter spans floor .. floor+24 dB, threshold mark at open_db
   if (s.floor_db != null) {

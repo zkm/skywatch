@@ -43,7 +43,7 @@ async def lifespan(app: FastAPI):
     live.close()
 
 
-app = FastAPI(title="skywatch", lifespan=lifespan)
+app = FastAPI(title="Skywatch", lifespan=lifespan)
 config.audio_dir.mkdir(parents=True, exist_ok=True)
 app.mount("/audio", StaticFiles(directory=config.audio_dir), name="audio")
 
@@ -107,9 +107,18 @@ async def sse(request: Request):
                              headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"})
 
 
+class WebFiles(StaticFiles):
+    """UI assets revalidate on every load so a new deploy shows up without a hard refresh."""
+
+    def file_response(self, *args, **kwargs):
+        resp = super().file_response(*args, **kwargs)
+        resp.headers["Cache-Control"] = "no-cache"
+        return resp
+
+
 @app.get("/")
 def index():
-    return FileResponse(WEB_DIR / "index.html")
+    return FileResponse(WEB_DIR / "index.html", headers={"Cache-Control": "no-cache"})
 
 
-app.mount("/", StaticFiles(directory=WEB_DIR), name="web")
+app.mount("/", WebFiles(directory=WEB_DIR), name="web")

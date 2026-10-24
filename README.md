@@ -1,4 +1,4 @@
-# skywatch
+# Skywatch
 
 Monitors HFGCS on 11175 kHz USB through public KiwiSDR receivers, cuts out each
 transmission, transcribes it with Whisper, and copies Emergency Action Messages

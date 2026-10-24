@@ -83,6 +83,7 @@ class Pipeline:
             "host": self.state.host,
             "since": self.state.since,
             "last_error": self.state.last_error,
+            "finished": self.state.finished,
             "freq_khz": self.cfg.freq_khz,
             "mode": self.cfg.mode,
             "level_db": round(s.level_db, 1),
