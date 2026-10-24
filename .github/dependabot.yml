@@ -5,6 +5,9 @@ updates:
     directory: /
     schedule:
       interval: monthly
+    # requirements.txt pins minimums (>=), which already allow the newest
+    # release; only open a PR when a release falls outside that range
+    versioning-strategy: increase-if-necessary
   - package-ecosystem: github-actions
     directory: /
     schedule:
