@@ -85,6 +85,19 @@ button { font: inherit; color: inherit; }
 .sql.open { background: var(--signal); border-color: var(--signal); color: #1b1600; }
 .sql.down { color: var(--pencil); border-color: var(--pencil); }
 .sql.ended { color: var(--ink-soft); border-style: dashed; }
+.notify {
+  display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px;
+  border: 1.5px solid var(--ink); border-radius: 999px; background: transparent;
+  font-size: 14px; font-weight: 600; cursor: pointer;
+}
+.notify[aria-pressed="true"] { background: var(--signal); border-color: var(--signal); color: #1b1600; }
+
+.toast {
+  position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); z-index: 1000;
+  width: max-content; max-width: min(520px, calc(100vw - 32px));
+  padding: 12px 16px; border-radius: 6px; background: var(--ink); color: var(--bg);
+  font-size: 15px; box-shadow: 0 6px 24px rgb(0 0 0 / .25);
+}
 
 main { max-width: 1120px; margin: 0 auto; padding: 0 clamp(16px, 4vw, 40px); }
 

@@ -36,6 +36,7 @@ class Pipeline:
         self.events = events
         self.live = live
         self.state = SourceState()
+        self.on_message = None   # optional callback(summary) after each stored message
         self.source = make_source(cfg, self.state)
         self.segmenter = Segmenter(
             cfg.sample_rate, cfg.open_db, cfg.close_db, cfg.hang_s, cfg.preroll_s,
@@ -148,3 +149,5 @@ class Pipeline:
         log.info("stored #%d %s %s", msg_id, parsed.kind, parsed.body or "")
         summary = self.store.list(limit=1)[0]
         self.events.emit("message", summary)
+        if self.on_message:
+            self.on_message(summary)

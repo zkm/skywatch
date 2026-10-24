@@ -42,6 +42,12 @@ CREATE TABLE IF NOT EXISTS corrections (
     created_at REAL NOT NULL,
     UNIQUE (message_id, pos, voter)      -- re-voting replaces your earlier vote
 );
+CREATE TABLE IF NOT EXISTS push_subscriptions (
+    endpoint   TEXT PRIMARY KEY,         -- browser push service URL
+    p256dh     TEXT NOT NULL,
+    auth       TEXT NOT NULL,
+    created_at REAL NOT NULL
+);
 """
 
 LIST_COLS = ("id, started_at, duration, kind, callsign, header, body, crowd_body, expected_len, "
@@ -132,6 +138,28 @@ class Store:
             self._db.execute("UPDATE messages SET crowd_body = ? WHERE id = ?", (crowd, msg_id))
             self._db.commit()
         return {"id": msg_id, "pos": pos, "corrections": tallies, "crowd_body": crowd}
+
+    def add_push_subscription(self, sub: dict[str, str], now: float) -> bool:
+        """Insert or refresh; True when the endpoint is new."""
+        with self._lock:
+            new = self._db.execute("SELECT 1 FROM push_subscriptions WHERE endpoint = ?",
+                                   (sub["endpoint"],)).fetchone() is None
+            self._db.execute(
+                "INSERT INTO push_subscriptions (endpoint, p256dh, auth, created_at) VALUES (?, ?, ?, ?) "
+                "ON CONFLICT (endpoint) DO UPDATE SET p256dh = excluded.p256dh, auth = excluded.auth",
+                (sub["endpoint"], sub["p256dh"], sub["auth"], now))
+            self._db.commit()
+        return new
+
+    def remove_push_subscription(self, endpoint: str) -> None:
+        with self._lock:
+            self._db.execute("DELETE FROM push_subscriptions WHERE endpoint = ?", (endpoint,))
+            self._db.commit()
+
+    def push_subscriptions(self) -> list[dict[str, str]]:
+        with self._lock:
+            return [dict(r) for r in self._db.execute(
+                "SELECT endpoint, p256dh, auth FROM push_subscriptions")]
 
     def counts(self) -> dict[str, int]:
         with self._lock:

@@ -72,6 +72,14 @@ class Config:
     correction_rate: int = field(  # per voter per hour
         default_factory=lambda: int(_env("CORRECTION_RATE", "120")))
 
+    # --- notifications ---
+    push_kinds: set[str] = field(  # which message kinds notify: eam, skyking, voice
+        default_factory=lambda: {k.strip() for k in _env("PUSH_KINDS", "eam").split(",") if k.strip()})
+    # VAPID "sub" claim: how push services reach whoever runs this server, as
+    # mailto:you@example.com or https://your.host (no path). Browser push is off until set.
+    push_subject: str = field(default_factory=lambda: _env("PUSH_SUBJECT", ""))
+    ntfy_url: str = field(default_factory=lambda: _env("NTFY_URL", ""))  # e.g. https://ntfy.sh/your-topic
+
     # --- strategic aircraft (ADS-B) ---
     adsb_enabled: bool = field(default_factory=lambda: _env("ADSB_ENABLED", "1") == "1")
     adsb_url: str = field(default_factory=lambda: _env("ADSB_URL", "https://api.adsb.lol/v2/mil"))
@@ -80,6 +88,10 @@ class Config:
     @property
     def audio_dir(self) -> Path:
         return self.data_dir / "audio"
+
+    @property
+    def vapid_path(self) -> Path:
+        return self.data_dir / "vapid_private.pem"
 
     @property
     def salt_path(self) -> Path:

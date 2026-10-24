@@ -19,6 +19,7 @@ from .config import config
 from .corrections import VALID_CHAR, RateLimiter, load_salt, voter_id
 from .live import EventBus, LiveEncoder
 from .pipeline import Pipeline
+from .push import Notifier, valid_subscription
 from .store import Store
 
 logging.basicConfig(level=os.environ.get("LOG_LEVEL", "INFO"),
@@ -34,6 +35,8 @@ pipeline: Optional[Pipeline] = None
 aircraft: Optional[AircraftWatch] = None
 salt = load_salt(config.salt_path)
 limiter = RateLimiter(config.correction_rate, 3600)
+notifier = Notifier(store, config.push_kinds, config.vapid_path, config.push_subject, config.ntfy_url)
+push_limiter = RateLimiter(20, 3600)
 
 
 @asynccontextmanager
@@ -44,6 +47,7 @@ async def lifespan(app: FastAPI):
     live.fanout.bind(loop)
     events.bind(loop)
     pipeline = Pipeline(config, store, events, live)
+    pipeline.on_message = notifier.message
     pipeline.start()
     if config.adsb_enabled:
         aircraft = AircraftWatch(config.adsb_url, config.adsb_poll_s,
@@ -114,6 +118,36 @@ def correct(msg_id: int, c: Correction, request: Request):
     result = store.correct(msg_id, c.pos, char, voter, config.correction_min_votes, time.time())
     events.emit("correction", result)
     return {**result, "min_votes": config.correction_min_votes}
+
+
+@app.get("/api/push/key")
+def push_key():
+    if not notifier.enabled:
+        raise HTTPException(503, "push notifications are not set up on this server")
+    return {"key": notifier.public_key, "kinds": sorted(config.push_kinds)}
+
+
+@app.post("/api/push/subscribe")
+async def push_subscribe(request: Request):
+    if not notifier.enabled:
+        raise HTTPException(503, "push notifications are not set up on this server")
+    sub = valid_subscription(await request.json())
+    if not sub:
+        raise HTTPException(400, "not a push subscription")
+    if not push_limiter.allow(voter_id(salt, client_ip(request))):
+        raise HTTPException(429, "too many subscription changes; try again later")
+    if store.add_push_subscription(sub, time.time()):
+        notifier.confirm(sub)      # first time only; pages re-sync quietly on every load
+    return {"ok": True}
+
+
+@app.post("/api/push/unsubscribe")
+async def push_unsubscribe(request: Request):
+    body = await request.json()
+    endpoint = body.get("endpoint") if isinstance(body, dict) else None
+    if isinstance(endpoint, str):
+        store.remove_push_subscription(endpoint)
+    return {"ok": True}
 
 
 @app.get("/api/aircraft")

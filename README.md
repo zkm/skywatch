@@ -75,6 +75,8 @@ On-air format (per priyom.org): preamble, first six characters + "stand by" x3,
 | `GET /api/messages/{id}` | full record: per-char timestamps, both sends, ASR words, `corrections` tallies |
 | `POST /api/messages/{id}/corrections` | `{"pos": 0-based, "char": "A"}`: one vote; re-voting replaces yours |
 | `GET /api/aircraft` | watched aircraft with recent trails |
+| `GET /api/push/key` | VAPID public key (503 when push is off) |
+| `POST /api/push/subscribe` / `unsubscribe` | browser `PushSubscription.toJSON()` / `{"endpoint"}` |
 | `GET /api/status` | receiver, level/floor dB, squelch, ASR queue, listeners |
 | `GET /api/events` | SSE: `status` every 0.5 s, `message`, `correction`, `aircraft` |
 | `GET /audio/<file>.mp3` | archived recording |
@@ -114,6 +116,23 @@ drop off 15 minutes after an aircraft was last heard. These aircraft often fly
 without ADS-B, so an empty map is the usual state. The demo site shows a
 snapshot taken when it was built.
 
+## Notifications
+
+"Notify me" in the header subscribes the browser to Web Push, and every new EAM
+then arrives as a system notification, even with the tab closed. Turn it on by
+setting `PUSH_SUBJECT` (`mailto:you@example.com`, or `https://your.host` with
+no path): push services use it to contact whoever runs the server, and the
+button stays hidden until it's set. The VAPID key is generated on first start at
+`DATA_DIR/vapid_private.pem`; keep it, since replacing it silently breaks every
+existing subscription. `PUSH_KINDS` picks what notifies (`eam`, `skyking`,
+`voice`).
+
+- iPhone/iPad only allow web push for sites added to the Home Screen; the button
+  explains this when tapped in Safari.
+- Push needs HTTPS in production (localhost is exempt).
+- `NTFY_URL=https://ntfy.sh/<topic>` also posts each message to an ntfy topic,
+  for people who'd rather use the ntfy app.
+
 ## Not built yet
 
-Push/email notifications (new EAMs, the E-4B appearing).
+An email alert when the E-4B appears.

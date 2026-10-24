@@ -9,6 +9,9 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..125,400..800&family=Martian+Mono:wght@400;600&display=swap" rel="stylesheet">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%231f2a2e'/%3E%3Cpath d='M4 20c3-8 5-8 8 0s5 8 8 0 5-8 8 0' fill='none' stroke='%23e8b030' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#1f2a2e">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -29,6 +32,10 @@
       <div class="meter-thresh" id="thresh"></div>
     </div>
     <span class="sql" id="sql" title="Squelch">idle</span>
+    <button id="notify" class="notify" aria-pressed="false" hidden>
+      <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M12 3a6 6 0 0 0-6 6v4l-2 3h16l-2-3V9a6 6 0 0 0-6-6zm-2 15a2 2 0 0 0 4 0" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+      <span id="notify-label">Notify me</span>
+    </button>
   </div>
   <p class="src" id="src">Connecting to receiver…</p>
 </header>
@@ -130,9 +137,11 @@
 <footer class="foot">
   <p>Audio is public HF from KiwiSDR receivers; aircraft positions are public ADS-B via adsb.lol. The messages are encrypted; this copies characters, it doesn't decode them.</p>
 </footer>
+<div class="toast" id="toast" role="status" hidden></div>
 <audio id="live" preload="none"></audio>
 <script src="app.js"></script>
 <script src="trainer.js"></script>
 <script src="aircraft.js"></script>
+<script src="notify.js"></script>
 </body>
 </html>
