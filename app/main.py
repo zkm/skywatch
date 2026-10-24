@@ -4,6 +4,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Optional
@@ -11,8 +12,11 @@ from typing import Optional
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
 
+from .aircraft import AircraftWatch
 from .config import config
+from .corrections import VALID_CHAR, RateLimiter, load_salt, voter_id
 from .live import EventBus, LiveEncoder
 from .pipeline import Pipeline
 from .store import Store
@@ -27,18 +31,27 @@ store = Store(config.db_path)
 events = EventBus(maxsize=256)
 live: Optional[LiveEncoder] = None
 pipeline: Optional[Pipeline] = None
+aircraft: Optional[AircraftWatch] = None
+salt = load_salt(config.salt_path)
+limiter = RateLimiter(config.correction_rate, 3600)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global live, pipeline
+    global live, pipeline, aircraft
     loop = asyncio.get_running_loop()
     live = LiveEncoder(config.sample_rate, config.live_bitrate)
     live.fanout.bind(loop)
     events.bind(loop)
     pipeline = Pipeline(config, store, events, live)
     pipeline.start()
+    if config.adsb_enabled:
+        aircraft = AircraftWatch(config.adsb_url, config.adsb_poll_s,
+                                 lambda snap: events.emit("aircraft", snap))
+        aircraft.start()
     yield
+    if aircraft:
+        aircraft.stop()
     pipeline.stop()
     live.close()
 
@@ -51,7 +64,8 @@ app.mount("/audio", StaticFiles(directory=config.audio_dir), name="audio")
 @app.get("/api/status")
 def status():
     assert pipeline is not None
-    return {**pipeline.status(), "counts": store.counts()}
+    return {**pipeline.status(), "counts": store.counts(),
+            "min_votes": config.correction_min_votes}
 
 
 @app.get("/api/messages")
@@ -67,6 +81,46 @@ def message(msg_id: int):
     if not m:
         raise HTTPException(404, "no such message")
     return m
+
+
+class Correction(BaseModel):
+    pos: int    # 0-based position in the message body
+    char: str
+
+
+def client_ip(request: Request) -> str:
+    if config.trust_proxy:
+        fwd = request.headers.get("x-forwarded-for")
+        if fwd:
+            return fwd.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
+
+
+@app.post("/api/messages/{msg_id}/corrections")
+def correct(msg_id: int, c: Correction, request: Request):
+    m = store.get(msg_id)
+    if not m:
+        raise HTTPException(404, "no such message")
+    if m["kind"] != "eam" or not m["body"]:
+        raise HTTPException(400, "only EAM copies take corrections")
+    char = c.char.strip().upper()
+    if not VALID_CHAR.match(char):
+        raise HTTPException(400, "one letter or digit")
+    if not 0 <= c.pos < len(m["body"]):
+        raise HTTPException(400, "position out of range")
+    voter = voter_id(salt, client_ip(request))
+    if not limiter.allow(voter):
+        raise HTTPException(429, "too many corrections; try again later")
+    result = store.correct(msg_id, c.pos, char, voter, config.correction_min_votes, time.time())
+    events.emit("correction", result)
+    return {**result, "min_votes": config.correction_min_votes}
+
+
+@app.get("/api/aircraft")
+def aircraft_now():
+    if not aircraft:
+        return {"updated_at": None, "source": None, "error": "ADS-B disabled", "aircraft": []}
+    return aircraft.snapshot()
 
 
 @app.get("/live.mp3")

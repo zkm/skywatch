@@ -63,10 +63,27 @@ class Config:
     # --- storage / web ---
     data_dir: Path = field(default_factory=lambda: Path(_env("DATA_DIR", "./data")))
     live_bitrate: str = field(default_factory=lambda: _env("LIVE_BITRATE", "32k"))
+    # honour X-Forwarded-For (only behind a reverse proxy you control)
+    trust_proxy: bool = field(default_factory=lambda: _env("TRUST_PROXY", "0") == "1")
+
+    # --- crowd corrections ---
+    correction_min_votes: int = field(
+        default_factory=lambda: int(_env("CORRECTION_MIN_VOTES", "2")))
+    correction_rate: int = field(  # per voter per hour
+        default_factory=lambda: int(_env("CORRECTION_RATE", "120")))
+
+    # --- strategic aircraft (ADS-B) ---
+    adsb_enabled: bool = field(default_factory=lambda: _env("ADSB_ENABLED", "1") == "1")
+    adsb_url: str = field(default_factory=lambda: _env("ADSB_URL", "https://api.adsb.lol/v2/mil"))
+    adsb_poll_s: float = field(default_factory=lambda: float(_env("ADSB_POLL_S", "30")))
 
     @property
     def audio_dir(self) -> Path:
         return self.data_dir / "audio"
+
+    @property
+    def salt_path(self) -> Path:
+        return self.data_dir / "voter.salt"
 
     @property
     def db_path(self) -> Path:

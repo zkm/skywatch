@@ -69,3 +69,9 @@ sky = ("Skyking, Skyking, do not answer. Iron Maiden, Iron Maiden. Time two five
        "Authentication Papa Sierra. This is Demo, out.")
 save("skyking", words(sky), sky, 20.0)
 save("eam", ws, text, ws[-1].end + 1)
+
+# a few crowd votes so the corrections UI has something to show: two listeners
+# agree position 12 is "9"; position 21 has one vote each way, so it stays "?"
+eam_id = store.list(["eam"], limit=1)[0]["id"]
+for voter, pos, char in (("demo-a", 11, "9"), ("demo-b", 11, "9"), ("demo-a", 20, "G"), ("demo-b", 20, "C")):
+    store.correct(eam_id, pos, char, voter, config.correction_min_votes, time.time())

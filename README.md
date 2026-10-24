@@ -2,7 +2,9 @@
 
 Monitors HFGCS on 11175 kHz USB through public KiwiSDR receivers, cuts out each
 transmission, transcribes it with Whisper, and copies Emergency Action Messages
-character by character. Serves a live MP3 stream, an archive, and a copy-pad UI.
+character by character. Serves a live MP3 stream, an archive, and a copy-pad UI
+where listeners correct the machine copy, plus a copy trainer and a map of
+strategic aircraft from public ADS-B.
 
 ```
 KiwiSDR ──kiwirecorder --nc-wav──▶ ffmpeg (16 kHz) ──┬─▶ live MP3 encoder ─▶ /live.mp3
@@ -42,8 +44,8 @@ is the easiest way to tune the squelch and judge Whisper model size.
 
 ## Demo site
 
-Every push to `main` builds a static demo with the sample EAM and Skyking and
-deploys it to GitHub Pages (`.github/workflows/pages.yml`):
+Every push to `main` builds a static demo with the sample EAM and Skyking (and an
+ADS-B snapshot) and deploys it to GitHub Pages (`.github/workflows/pages.yml`):
 https://zkm.github.io/skywatch/. No live audio there; it only shows the UI.
 Build it locally with `python tools/build_pages.py _site`.
 
@@ -70,9 +72,11 @@ On-air format (per priyom.org): preamble, first six characters + "stand by" x3,
 |---|---|
 | `GET /live.mp3` | live 32 kbps stream (silence-filled when the receiver is down) |
 | `GET /api/messages?kind=eam\|skyking\|voice\|all&limit=&before=` | archive, newest first |
-| `GET /api/messages/{id}` | full record: per-char timestamps, both sends, ASR words |
+| `GET /api/messages/{id}` | full record: per-char timestamps, both sends, ASR words, `corrections` tallies |
+| `POST /api/messages/{id}/corrections` | `{"pos": 0-based, "char": "A"}`: one vote; re-voting replaces yours |
+| `GET /api/aircraft` | watched aircraft with recent trails |
 | `GET /api/status` | receiver, level/floor dB, squelch, ASR queue, listeners |
-| `GET /api/events` | SSE: `status` every 0.5 s, `transmission`, `message` |
+| `GET /api/events` | SSE: `status` every 0.5 s, `message`, `correction`, `aircraft` |
 | `GET /audio/<file>.mp3` | archived recording |
 
 ## Tuning
@@ -84,8 +88,32 @@ On-air format (per priyom.org): preamble, first six characters + "stand by" x3,
   or `WHISPER_DEVICE=cuda` copies noticeably better on weak signals.
 - Public Kiwis drop users (time limits, full slots). List several in `KIWI_HOSTS`.
 
+## Crowd corrections
+
+Select any character in an EAM copy to hear it and vote on what it really was
+(arrow keys move, typing a letter starts a vote). A position switches to the
+crowd's character once `CORRECTION_MIN_VOTES` listeners agree and no other
+character ties it; the machine copy is always kept. Voters are identified by a
+salted hash of their IP (`DATA_DIR/voter.salt`), one vote per position, and
+rate-limited by `CORRECTION_RATE` per hour. Behind a reverse proxy set
+`TRUST_PROXY=1` or every listener looks like the proxy.
+
+## Copy trainer
+
+Plays a random archived EAM and lets you copy it into a grid, then marks each
+character against the reference (machine copy plus crowd corrections). Any
+positions nobody has copied yet can be sent straight in as corrections. It runs
+in the browser, so it works on the demo site too.
+
+## Strategic aircraft
+
+Polls `ADSB_URL` (adsb.lol's military feed by default) every `ADSB_POLL_S` and
+keeps E-6B, E-4B, B-52H, B-2 and WC-135/OC-135 by ICAO type, plus the four E-4B
+tails by registration (`app/aircraft.py`). Positions keep a ~1 hour trail and
+drop off 15 minutes after an aircraft was last heard. These aircraft often fly
+without ADS-B, so an empty map is the usual state. The demo site shows a
+snapshot taken when it was built.
+
 ## Not built yet
 
-Crowd corrections, aircraft map / ADS-B alerts, push/email notifications, and
-the copy trainer. The schema keeps per-character timestamps and alternates so
-a corrections table can reference positions directly.
+Push/email notifications (new EAMs, the E-4B appearing).

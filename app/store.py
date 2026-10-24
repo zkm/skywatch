@@ -7,6 +7,8 @@ import threading
 from pathlib import Path
 from typing import Any, Optional
 
+from .corrections import Tallies, crowd_copy
+
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS messages (
     id           INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -31,9 +33,18 @@ CREATE TABLE IF NOT EXISTS messages (
     floor_db     REAL
 );
 CREATE INDEX IF NOT EXISTS messages_kind_time ON messages(kind, started_at DESC);
+CREATE TABLE IF NOT EXISTS corrections (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    message_id INTEGER NOT NULL REFERENCES messages(id),
+    pos        INTEGER NOT NULL,         -- 0-based index into messages.body
+    char       TEXT NOT NULL,
+    voter      TEXT NOT NULL,            -- salted hash, see corrections.voter_id
+    created_at REAL NOT NULL,
+    UNIQUE (message_id, pos, voter)      -- re-voting replaces your earlier vote
+);
 """
 
-LIST_COLS = ("id, started_at, duration, kind, callsign, header, body, expected_len, "
+LIST_COLS = ("id, started_at, duration, kind, callsign, header, body, crowd_body, expected_len, "
              "unknowns, skyking, audio, freq_khz")
 
 
@@ -44,6 +55,10 @@ class Store:
         self._db.row_factory = sqlite3.Row
         self._db.execute("PRAGMA journal_mode=WAL")
         self._db.executescript(SCHEMA)
+        cols = {r["name"] for r in self._db.execute("PRAGMA table_info(messages)")}
+        if "crowd_body" not in cols:     # databases created before crowd corrections
+            self._db.execute("ALTER TABLE messages ADD COLUMN crowd_body TEXT")
+            self._db.commit()
         self._lock = threading.Lock()
 
     def insert(self, row: dict[str, Any]) -> int:
@@ -87,7 +102,36 @@ class Store:
     def get(self, msg_id: int) -> Optional[dict[str, Any]]:
         with self._lock:
             r = self._db.execute("SELECT * FROM messages WHERE id = ?", (msg_id,)).fetchone()
-        return self._decode(r) if r else None
+            if not r:
+                return None
+            d = self._decode(r)
+            d["corrections"] = self._tallies(msg_id)
+        return d
+
+    def _tallies(self, msg_id: int) -> Tallies:
+        out: Tallies = {}
+        for r in self._db.execute(
+                "SELECT pos, char, COUNT(*) AS n FROM corrections WHERE message_id = ? "
+                "GROUP BY pos, char", (msg_id,)):
+            out.setdefault(r["pos"], {})[r["char"]] = r["n"]
+        return out
+
+    def correct(self, msg_id: int, pos: int, char: str, voter: str, min_votes: int,
+                now: float) -> dict[str, Any]:
+        """Record (or replace) one voter's call for one position; returns the new state."""
+        with self._lock:
+            body = self._db.execute("SELECT body FROM messages WHERE id = ?",
+                                    (msg_id,)).fetchone()["body"]
+            self._db.execute(
+                "INSERT INTO corrections (message_id, pos, char, voter, created_at) "
+                "VALUES (?, ?, ?, ?, ?) ON CONFLICT (message_id, pos, voter) "
+                "DO UPDATE SET char = excluded.char, created_at = excluded.created_at",
+                (msg_id, pos, char, voter, now))
+            tallies = self._tallies(msg_id)
+            crowd = crowd_copy(body, tallies, min_votes)
+            self._db.execute("UPDATE messages SET crowd_body = ? WHERE id = ?", (crowd, msg_id))
+            self._db.commit()
+        return {"id": msg_id, "pos": pos, "corrections": tallies, "crowd_body": crowd}
 
     def counts(self) -> dict[str, int]:
         with self._lock:

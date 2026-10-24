@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Skywatch</title>
-<meta name="description" content="Live HFGCS monitor: listen to 11175 kHz and read machine copy of every Emergency Action Message.">
+<meta name="description" content="Live HFGCS monitor: listen to 11175 kHz, help copy Emergency Action Messages, practise copying, and see strategic aircraft on public ADS-B.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..125,400..800&family=Martian+Mono:wght@400;600&display=swap" rel="stylesheet">
@@ -32,8 +32,13 @@
   </div>
   <p class="src" id="src">Connecting to receiver…</p>
 </header>
+<nav class="views" aria-label="Sections">
+  <a href="#monitor">Monitor</a>
+  <a href="#trainer">Copy trainer</a>
+  <a href="#aircraft">Aircraft</a>
+</nav>
 
-<main>
+<main id="view-monitor">
   <section class="pad" id="pad" aria-label="Selected message">
     <div class="pad-empty" id="pad-empty">
       <p>No messages copied yet. They'll appear here the moment one comes in, or pick one from the log.</p>
@@ -45,6 +50,17 @@
       </div>
       <audio id="player" controls preload="metadata"></audio>
       <div id="pad-copy"></div>
+      <div class="fix" id="fix" hidden aria-live="polite">
+        <p class="fix-head" id="fix-head"></p>
+        <p class="fix-info" id="fix-info"></p>
+        <form class="fix-form" id="fix-form">
+          <label for="fix-char">What did you hear?</label>
+          <input id="fix-char" maxlength="1" autocomplete="off" autocapitalize="characters" spellcheck="false">
+          <button type="submit" class="btn primary">Submit</button>
+          <span class="fix-quick" id="fix-quick"></span>
+        </form>
+        <p class="fix-note" id="fix-note"></p>
+      </div>
       <details class="transcript">
         <summary>Machine transcript</summary>
         <p id="pad-transcript"></p>
@@ -69,10 +85,54 @@
   </section>
 </main>
 
+<main id="view-trainer" hidden>
+  <section class="page">
+    <h2>Copy trainer</h2>
+    <p class="lede">Play a real recording and write down each character as it's read. The header comes first, then the whole message, then the message again after “I say again”, so you get a second pass.</p>
+    <p class="lede" id="tr-empty" hidden>No EAM recordings to practise on yet.</p>
+    <div id="tr-body">
+      <p class="pad-meta" id="tr-meta"></p>
+      <div class="tr-controls">
+        <audio id="tr-player" controls preload="metadata"></audio>
+        <label class="tr-rate">Speed
+          <select id="tr-rate"><option value="0.75">0.75×</option><option value="0.9">0.9×</option><option value="1" selected>1×</option></select>
+        </label>
+      </div>
+      <div class="cells" id="tr-grid"></div>
+      <div class="tr-actions">
+        <button class="btn primary" id="tr-check">Check my copy</button>
+        <button class="btn" id="tr-clear">Clear</button>
+        <button class="btn" id="tr-next">Another message</button>
+      </div>
+      <p class="tr-score" id="tr-score" aria-live="polite"></p>
+      <div class="copy-block" id="tr-result" hidden><h3>Reference copy (machine, plus listeners' corrections)</h3></div>
+      <div class="tr-share" id="tr-share" hidden>
+        <p id="tr-share-text"></p>
+        <button class="btn primary" id="tr-send">Send as corrections</button>
+      </div>
+    </div>
+  </section>
+</main>
+
+<main id="view-aircraft" hidden>
+  <section class="page">
+    <h2>Strategic aircraft</h2>
+    <p class="lede">E-6B Mercury (TACAMO), E-4B Nightwatch, B-52H, B-2 and WC-135, whenever public ADS-B receivers hear them. They often fly without broadcasting, so an empty map is normal.</p>
+    <p class="pad-meta" id="air-meta">Loading…</p>
+    <div class="map" id="map" role="region" aria-label="Map of tracked aircraft"></div>
+    <table class="rows air-rows">
+      <thead><tr><th>Aircraft</th><th>Callsign</th><th>Tail</th><th class="num">Altitude</th><th class="num">Speed</th><th class="num">Heard</th></tr></thead>
+      <tbody id="air-rows"></tbody>
+    </table>
+  </section>
+</main>
+
 <footer class="foot">
-  <p>Audio is public HF from KiwiSDR receivers. The messages are encrypted; this copies characters, it doesn't decode them.</p>
+  <p>Audio is public HF from KiwiSDR receivers; aircraft positions are public ADS-B via adsb.lol. The messages are encrypted; this copies characters, it doesn't decode them.</p>
 </footer>
 <audio id="live" preload="none"></audio>
 <script src="app.js"></script>
+<script src="trainer.js"></script>
+<script src="aircraft.js"></script>
 </body>
 </html>
