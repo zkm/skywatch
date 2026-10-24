@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>EAM Watch</title>
+<meta name="description" content="Live HFGCS monitor: listen to 11175 kHz and read machine copy of every Emergency Action Message.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..125,400..800&family=Martian+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<header class="bar">
+  <h1 class="mark">EAM Watch</h1>
+  <div class="tuner" aria-live="polite">
+    <button id="listen" class="listen" aria-pressed="false">
+      <span class="listen-icon" aria-hidden="true"></span><span id="listen-label">Listen live</span>
+    </button>
+    <div class="dial">
+      <span class="freq" id="freq">11175</span><span class="unit">kHz <span id="mode">USB</span></span>
+    </div>
+    <div class="meter" title="Signal above noise floor">
+      <div class="meter-fill" id="meter"></div>
+      <div class="meter-thresh" id="thresh"></div>
+    </div>
+    <span class="sql" id="sql" title="Squelch">idle</span>
+  </div>
+  <p class="src" id="src">Connecting to receiver…</p>
+</header>
+
+<main>
+  <section class="pad" id="pad" aria-label="Selected message">
+    <div class="pad-empty" id="pad-empty">
+      <p>No messages copied yet. They'll appear here the moment one comes in, or pick one from the log.</p>
+    </div>
+    <div class="pad-body" id="pad-body" hidden>
+      <div class="pad-head">
+        <h2 id="pad-title"></h2>
+        <p class="pad-meta" id="pad-meta"></p>
+      </div>
+      <audio id="player" controls preload="none"></audio>
+      <div id="pad-copy"></div>
+      <details class="transcript">
+        <summary>Machine transcript</summary>
+        <p id="pad-transcript"></p>
+      </details>
+    </div>
+  </section>
+
+  <section class="log" aria-label="Message log">
+    <div class="log-head">
+      <h2>Log</h2>
+      <div class="filters" role="tablist">
+        <button role="tab" data-kind="eam" aria-selected="true">EAMs</button>
+        <button role="tab" data-kind="skyking" aria-selected="false">Skykings</button>
+        <button role="tab" data-kind="all" aria-selected="false">Everything</button>
+      </div>
+    </div>
+    <table class="rows">
+      <thead><tr><th>Time (Z)</th><th>From</th><th>Copy</th><th class="num">Length</th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+    <button class="more" id="more" hidden>Show older</button>
+  </section>
+</main>
+
+<footer class="foot">
+  <p>Audio is public HF from KiwiSDR receivers. The messages are encrypted; this copies characters, it doesn't decode them.</p>
+</footer>
+<audio id="live" preload="none"></audio>
+<script src="/app.js"></script>
+</body>
+</html>

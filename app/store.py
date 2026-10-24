@@ -1,0 +1,95 @@
+"""SQLite persistence."""
+from __future__ import annotations
+
+import json
+import sqlite3
+import threading
+from pathlib import Path
+from typing import Any, Optional
+
+SCHEMA = """
+CREATE TABLE IF NOT EXISTS messages (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    started_at   REAL NOT NULL,          -- epoch seconds, UTC
+    duration     REAL NOT NULL,
+    kind         TEXT NOT NULL,          -- eam | skyking | voice
+    callsign     TEXT,
+    header       TEXT,
+    body         TEXT,
+    copy1        TEXT,
+    copy2        TEXT,
+    expected_len INTEGER,
+    unknowns     INTEGER,                -- count of '?' in body
+    chars        TEXT,                   -- JSON [{c,t0,t1,p,alts}]
+    skyking      TEXT,                   -- JSON
+    transcript   TEXT,
+    words        TEXT,                   -- JSON [{text,start,end,prob}]
+    audio        TEXT NOT NULL,          -- file name under DATA_DIR/audio
+    source       TEXT,
+    freq_khz     REAL,
+    peak_db      REAL,
+    floor_db     REAL
+);
+CREATE INDEX IF NOT EXISTS messages_kind_time ON messages(kind, started_at DESC);
+"""
+
+LIST_COLS = ("id, started_at, duration, kind, callsign, header, body, expected_len, "
+             "unknowns, skyking, audio, freq_khz")
+
+
+class Store:
+    def __init__(self, path: Path) -> None:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        self._db = sqlite3.connect(path, check_same_thread=False)
+        self._db.row_factory = sqlite3.Row
+        self._db.execute("PRAGMA journal_mode=WAL")
+        self._db.executescript(SCHEMA)
+        self._lock = threading.Lock()
+
+    def insert(self, row: dict[str, Any]) -> int:
+        row = dict(row)
+        for k in ("chars", "skyking", "words"):
+            if row.get(k) is not None and not isinstance(row[k], str):
+                row[k] = json.dumps(row[k])
+        cols = ", ".join(row)
+        qs = ", ".join("?" for _ in row)
+        with self._lock:
+            cur = self._db.execute(f"INSERT INTO messages ({cols}) VALUES ({qs})",
+                                   tuple(row.values()))
+            self._db.commit()
+            return int(cur.lastrowid)
+
+    @staticmethod
+    def _decode(r: sqlite3.Row) -> dict[str, Any]:
+        d = dict(r)
+        for k in ("chars", "skyking", "words"):
+            if d.get(k):
+                d[k] = json.loads(d[k])
+        return d
+
+    def list(self, kinds: Optional[list[str]] = None, limit: int = 50,
+             before: Optional[int] = None) -> list[dict[str, Any]]:
+        where, args = [], []
+        if kinds:
+            where.append(f"kind IN ({','.join('?' * len(kinds))})")
+            args += kinds
+        if before:
+            where.append("id < ?")
+            args.append(before)
+        sql = f"SELECT {LIST_COLS} FROM messages"
+        if where:
+            sql += " WHERE " + " AND ".join(where)
+        sql += " ORDER BY id DESC LIMIT ?"
+        args.append(min(max(limit, 1), 200))
+        with self._lock:
+            return [self._decode(r) for r in self._db.execute(sql, args)]
+
+    def get(self, msg_id: int) -> Optional[dict[str, Any]]:
+        with self._lock:
+            r = self._db.execute("SELECT * FROM messages WHERE id = ?", (msg_id,)).fetchone()
+        return self._decode(r) if r else None
+
+    def counts(self) -> dict[str, int]:
+        with self._lock:
+            return {r["kind"]: r["n"] for r in
+                    self._db.execute("SELECT kind, COUNT(*) AS n FROM messages GROUP BY kind")}
