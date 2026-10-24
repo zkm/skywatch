@@ -201,7 +201,7 @@ the squelch and choose a Whisper model size.
 
 **Demo site.** Every push to `main` runs the tests, builds a static copy of the
 UI with the sample data and an ADS-B snapshot, and deploys it to GitHub Pages
-(`.github/workflows/pages.yml`). Build it locally with
+(`.github/workflows/ci.yml`). Build it locally with
 `python tools/build_pages.py _site`.
 
 **Layout**
@@ -262,3 +262,7 @@ tests/            pytest suite
   and [OpenStreetMap](https://www.openstreetmap.org/copyright) contributors.
 - Transcription: [faster-whisper](https://github.com/SYSTRAN/faster-whisper).
 - Inspired by [missileer.watch](https://missileer.watch).
+
+## License
+
+[MIT](LICENSE). To report a security problem, see [SECURITY.md](SECURITY.md).
