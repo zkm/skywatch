@@ -42,7 +42,7 @@ jobs:
           pip install numpy
       - name: Build static demo
         run: python tools/build_pages.py _site
-      - uses: actions/configure-pages@v5
+      - uses: actions/configure-pages@v6
       - uses: actions/upload-pages-artifact@v5
         with:
           path: _site
