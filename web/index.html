@@ -15,23 +15,24 @@
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
+<a class="skip" href="#" id="skip">Skip to content</a>
 <header class="bar">
   <div class="brand">
     <h1 class="mark">Skywatch</h1>
     <p class="tag">HFGCS monitor</p>
   </div>
-  <div class="tuner" aria-live="polite">
-    <button id="listen" class="listen" aria-pressed="false">
+  <div class="tuner">
+    <button id="listen" class="listen">
       <span class="listen-icon" aria-hidden="true"></span><span id="listen-label">Listen live</span>
     </button>
     <div class="dial">
       <span class="freq" id="freq">11175</span><span class="unit">kHz <span id="mode">USB</span></span>
     </div>
-    <div class="meter" title="Signal above noise floor">
+    <div class="meter" id="meter-box" role="img" aria-label="Signal meter" title="Signal above noise floor">
       <div class="meter-fill" id="meter"></div>
       <div class="meter-thresh" id="thresh"></div>
     </div>
-    <span class="sql" id="sql" title="Squelch">idle</span>
+    <span class="sql" id="sql" title="Squelch"><span class="sr-only">Squelch: </span><span id="sql-state">idle</span></span>
     <button id="notify" class="notify" aria-pressed="false" hidden>
       <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M12 3a6 6 0 0 0-6 6v4l-2 3h16l-2-3V9a6 6 0 0 0-6-6zm-2 15a2 2 0 0 0 4 0" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
       <span id="notify-label">Notify me</span>
@@ -45,7 +46,7 @@
   <a href="#aircraft">Aircraft</a>
 </nav>
 
-<main id="view-monitor">
+<main id="view-monitor" tabindex="-1">
   <section class="pad" id="pad" aria-label="Selected message">
     <div class="pad-empty" id="pad-empty">
       <p>No messages copied yet. They'll appear here the moment one comes in, or pick one from the log.</p>
@@ -78,10 +79,10 @@
   <section class="log" aria-label="Message log">
     <div class="log-head">
       <h2>Log</h2>
-      <div class="filters" role="tablist">
-        <button role="tab" data-kind="eam" aria-selected="true">EAMs</button>
-        <button role="tab" data-kind="skyking" aria-selected="false">Skykings</button>
-        <button role="tab" data-kind="all" aria-selected="false">Everything</button>
+      <div class="filters" role="group" aria-label="Show">
+        <button data-kind="eam" aria-pressed="true">EAMs</button>
+        <button data-kind="skyking" aria-pressed="false">Skykings</button>
+        <button data-kind="all" aria-pressed="false">Everything</button>
       </div>
     </div>
     <table class="rows">
@@ -92,7 +93,7 @@
   </section>
 </main>
 
-<main id="view-trainer" hidden>
+<main id="view-trainer" tabindex="-1" hidden>
   <section class="page">
     <h2>Copy trainer</h2>
     <p class="lede">Play a real recording and write down each character as it's read. The header comes first, then the whole message, then the message again after “I say again”, so you get a second pass.</p>
@@ -121,7 +122,7 @@
   </section>
 </main>
 
-<main id="view-aircraft" hidden>
+<main id="view-aircraft" tabindex="-1" hidden>
   <section class="page">
     <h2>Strategic aircraft</h2>
     <p class="lede">E-6B Mercury (TACAMO), E-4B Nightwatch, B-52H, B-2 and WC-135, whenever public ADS-B receivers hear them. They often fly without broadcasting, so an empty map is normal.</p>
@@ -138,6 +139,7 @@
   <p>Audio is public HF from KiwiSDR receivers; aircraft positions are public ADS-B via adsb.lol. The messages are encrypted; this copies characters, it doesn't decode them.</p>
 </footer>
 <div class="toast" id="toast" role="status" hidden></div>
+<div class="sr-only" id="announce" aria-live="polite"></div>
 <audio id="live" preload="none"></audio>
 <script src="app.js"></script>
 <script src="trainer.js"></script>

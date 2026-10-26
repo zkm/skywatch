@@ -40,10 +40,16 @@ const myVotes = {
   },
 };
 
+// polite screen-reader announcement (new messages and the like)
+const announce = (text) => { $("announce").textContent = ""; setTimeout(() => { $("announce").textContent = text; }, 50); };
+
 /* ---------- views ---------- */
 const VIEWS = ["monitor", "trainer", "aircraft"];
+const TITLES = { monitor: "Skywatch", trainer: "Copy trainer · Skywatch", aircraft: "Strategic aircraft · Skywatch" };
+const currentView = () => (VIEWS.includes(location.hash.slice(1)) ? location.hash.slice(1) : "monitor");
 function route() {
-  const name = VIEWS.includes(location.hash.slice(1)) ? location.hash.slice(1) : "monitor";
+  const name = currentView();
+  document.title = TITLES[name];
   VIEWS.forEach((v) => { $(`view-${v}`).hidden = v !== name; });
   document.querySelectorAll(".views a").forEach((a) => {
     if (a.getAttribute("href") === `#${name}`) a.setAttribute("aria-current", "page");
@@ -52,6 +58,8 @@ function route() {
   hooks.view?.(name);
 }
 window.addEventListener("hashchange", route);
+// the views live behind hash routes, so the skip link focuses the visible one instead of navigating
+$("skip").addEventListener("click", (e) => { e.preventDefault(); $(`view-${currentView()}`).focus(); });
 document.addEventListener("DOMContentLoaded", route);   // after trainer.js / aircraft.js have registered
 
 /* ---------- live audio + status ---------- */
@@ -61,19 +69,19 @@ $("listen").addEventListener("click", () => {
   if (live.paused) {
     live.src = "live.mp3?t=" + Date.now();     // fresh connection, no stale buffer
     live.play().catch(() => {});
-    btn.setAttribute("aria-pressed", "true");
-    $("listen-label").textContent = "Stop";
+    btn.classList.add("on");
+    $("listen-label").textContent = "Stop listening";
   } else {
     live.pause(); live.removeAttribute("src"); live.load();
-    btn.setAttribute("aria-pressed", "false");
+    btn.classList.remove("on");
     $("listen-label").textContent = "Listen live";
   }
 });
 
 function renderStatus(s) {
-  const sql = $("sql");
+  const sql = $("sql"), sqlState = $("sql-state");
   if (DEMO) {
-    sql.textContent = "demo"; sql.className = "sql ended";
+    sqlState.textContent = "demo"; sql.className = "sql ended";
     $("src").textContent = "Sample data only. Run Skywatch yourself to monitor 11175 kHz live.";
     return;
   }
@@ -82,13 +90,13 @@ function renderStatus(s) {
   $("mode").textContent = (s.mode || "").toUpperCase();
   const name = (s.host || "").startsWith("file:") ? s.host.slice(5) : s.host;
   if (!s.connected && s.finished) {
-    sql.textContent = "ended"; sql.className = "sql ended";
+    sqlState.textContent = "ended"; sql.className = "sql ended";
     $("src").textContent = `Finished playing ${name}. Restart the server to play it again.`;
   } else if (!s.connected) {
-    sql.textContent = "no signal"; sql.className = "sql down";
+    sqlState.textContent = "no signal"; sql.className = "sql down";
     $("src").textContent = s.last_error ? `Receiver offline: ${s.last_error}. Retrying.` : "Connecting to receiver…";
   } else {
-    sql.textContent = s.squelch_open ? "copying" : "idle";
+    sqlState.textContent = s.squelch_open ? "copying" : "idle";
     sql.className = "sql" + (s.squelch_open ? " open" : "");
     const busy = s.asr_busy ? " · transcribing…" : "";
     const who = s.listeners === 1 ? "1 listener" : `${s.listeners} listeners`;
@@ -101,6 +109,8 @@ function renderStatus(s) {
     const frac = Math.max(0, Math.min(1, (s.level_db - s.floor_db) / span));
     $("meter").style.width = `${frac * 100}%`;
     $("thresh").style.left = `${(s.open_db / span) * 100}%`;
+    $("meter-box").setAttribute("aria-label",
+      `Signal ${Math.max(0, Math.round(s.level_db - s.floor_db))} dB above the noise floor; copying starts at ${s.open_db} dB`);
   }
 }
 
@@ -112,8 +122,9 @@ function rowHtml(m, isNew) {
     const k = m.skyking || {};
     copy = `<span class="kind">Skyking</span>${esc(k.codeword || "?")}, time ${esc(k.time || "??")}, auth ${esc(k.authentication || "??")}`;
   } else copy = `<span class="kind">Voice</span>`;
-  return `<tr data-id="${m.id}" tabindex="0" class="${isNew ? "new" : ""} ${state.selected === m.id ? "sel" : ""}">
-    <td class="t">${zTime(m.started_at)}</td>
+  const sel = state.selected === m.id;
+  return `<tr data-id="${m.id}" class="${isNew ? "new" : ""} ${sel ? "sel" : ""}">
+    <td class="t"><button type="button" class="rowbtn"${sel ? ' aria-current="true"' : ""}>${zTime(m.started_at)}</button></td>
     <td>${esc(m.callsign || "—")}</td>
     <td class="code">${copy}</td>
     <td class="num">${m.kind === "eam" && m.body ? `${m.body.length}/${m.expected_len}` : dur(m.duration)}</td></tr>`;
@@ -143,14 +154,10 @@ $("rows").addEventListener("click", (e) => {
   const tr = e.target.closest("tr[data-id]");
   if (tr) select(+tr.dataset.id);
 });
-$("rows").addEventListener("keydown", (e) => {
-  const tr = e.target.closest("tr[data-id]");
-  if (tr && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); select(+tr.dataset.id); }
-});
 $("more").addEventListener("click", () => loadRows(true));
 document.querySelectorAll(".filters button").forEach((b) =>
   b.addEventListener("click", () => {
-    document.querySelectorAll(".filters button").forEach((x) => x.setAttribute("aria-selected", x === b));
+    document.querySelectorAll(".filters button").forEach((x) => x.setAttribute("aria-pressed", x === b));
     state.kind = b.dataset.kind;
     loadRows();
   }));
@@ -164,12 +171,13 @@ let charTimes = [];
 function cells(str, small) {
   const wrap = document.createElement("div");
   wrap.className = "cells" + (small ? " small" : "");
+  wrap.setAttribute("role", "img");
+  wrap.setAttribute("aria-label", [...str].map((c) => (c === "?" ? "unknown" : c)).join(", "));
   [...str].forEach((c, i) => {
     const s = document.createElement("span");
     s.className = "cell static" + (c === "?" ? " unk" : "");
     s.textContent = c;
     s.dataset.n = i + 1;
-    s.setAttribute("aria-label", `Character ${i + 1}: ${c === "?" ? "unknown" : c}`);
     wrap.appendChild(s);
   });
   return wrap;
@@ -257,7 +265,7 @@ function renderFix() {
   $("fix-info").innerHTML = lines.map((l) => `<span>${esc(l)}</span>`).join("");
 
   const quick = [...new Set([...(info?.alts || []), ...votes.map(([c]) => c)])].filter((c) => /^[A-Z0-9]$/.test(c)).slice(0, 4);
-  $("fix-quick").innerHTML = quick.map((c) => `<button type="button" class="btn small" data-c="${esc(c)}">${esc(c)}</button>`).join("");
+  $("fix-quick").innerHTML = quick.map((c) => `<button type="button" class="btn small" data-c="${esc(c)}" aria-label="Vote ${esc(c)}">${esc(c)}</button>`).join("");
   $("fix-char").value = "";
   const form = $("fix-form");
   form.querySelectorAll("input, button").forEach((el) => { el.disabled = DEMO; });
@@ -313,7 +321,12 @@ function applyCorrection(c) {
 
 async function select(id) {
   state.selected = id;
-  document.querySelectorAll("#rows tr").forEach((tr) => tr.classList.toggle("sel", +tr.dataset.id === id));
+  document.querySelectorAll("#rows tr").forEach((tr) => {
+    const on = +tr.dataset.id === id;
+    tr.classList.toggle("sel", on);
+    const b = tr.querySelector(".rowbtn");
+    if (b) { if (on) b.setAttribute("aria-current", "true"); else b.removeAttribute("aria-current"); }
+  });
   const m = await getJSON(api.msg(id));
   state.msg = m;
   state.pick = null;
@@ -374,6 +387,9 @@ function connectEvents() {
   es.addEventListener("status", (e) => renderStatus(JSON.parse(e.data)));
   es.addEventListener("message", (e) => {
     const m = JSON.parse(e.data);
+    if (m.kind !== "voice") {
+      announce(m.kind === "eam" ? `New EAM copied, ${(m.body || "").length} characters.` : "New Skyking copied.");
+    }
     if (state.kind !== "all" && state.kind !== m.kind) return;
     state.rows.unshift(m);
     renderRows(m.id);
