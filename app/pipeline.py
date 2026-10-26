@@ -16,7 +16,7 @@ from .phonetic import parse
 from .segmenter import Segmenter, Transmission
 from .source import SourceState, make_source
 from .store import Store
-from .transcriber import make_transcriber
+from .transcriber import looks_like_noise, make_transcriber
 
 log = logging.getLogger("skywatch.pipeline")
 
@@ -117,8 +117,9 @@ class Pipeline:
         parsed = parse(words, self.cfg.min_word_prob)
         if parsed.kind == "voice" and not self.cfg.keep_non_eam:
             return
-        if parsed.kind == "voice" and not text and self.cfg.asr_backend != "none":
-            return  # ASR heard nothing: squelch opened on noise/QRM
+        if parsed.kind == "voice" and self.cfg.asr_backend != "none" and looks_like_noise(text):
+            log.info("dropped %.0fs transmission as noise: %r", tx.duration, text[:80])
+            return  # ASR heard nothing real: squelch opened on noise/QRM
 
         stamp = datetime.fromtimestamp(tx.started_at, timezone.utc).strftime("%Y%m%dT%H%M%SZ")
         fname = f"{stamp}_{parsed.kind}.mp3"
