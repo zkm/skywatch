@@ -13,8 +13,10 @@ unless you'd rather not be.
 
 ## Supported versions
 
-Skywatch has no releases yet. Fixes go to `main`, and only the latest `main` is
-supported.
+Fixes go to `main`, which deploys to https://skywatch.zkm.tw automatically.
+Only the latest `main` is supported. Tagged
+[releases](https://github.com/zkm/skywatch/releases) mark milestones and
+don't get separate patches.
 
 ## Scope
 
