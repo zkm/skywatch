@@ -17,10 +17,10 @@ def voice(sec, amp, rng):
     return (tone * env * amp + rng.standard_normal(len(t)) * 300).astype(np.int16)
 
 
-def run(audio):
+def run(audio, max_tx_s=600):
     got = []
     clock = [0.0]
-    seg = Segmenter(SR, 8, 5, 3.0, 1.0, 4.0, 600, got.append, clock=lambda: clock[0])
+    seg = Segmenter(SR, 8, 5, 3.0, 1.0, 4.0, max_tx_s, got.append, clock=lambda: clock[0])
     for i in range(0, len(audio), 1600):
         clock[0] = (i + 1600) / SR
         seg.feed(audio[i:i + 1600].tobytes())
@@ -51,3 +51,15 @@ def test_two_transmissions_and_short_blip_ignored():
 def test_noise_only():
     rng = np.random.default_rng(3)
     assert run(noise(60, 300, rng)) == []
+
+
+def test_stale_floor_is_remeasured_after_a_max_length_transmission():
+    # background noise jumps 20 dB and stays there (gain change, band opening)
+    rng = np.random.default_rng(3)
+    audio = np.concatenate([noise(10, 300, rng), noise(200, 3000, rng),
+                            voice(8, 30000, rng), noise(20, 3000, rng)])
+    txs = run(audio, max_tx_s=60)
+    # one max-length capture of the new noise, then the floor catches up: no endless
+    # back-to-back 60 s captures, and the later real transmission still opens it
+    assert sum(t.duration >= 59 for t in txs) == 1, [round(t.duration) for t in txs]
+    assert any(5 < t.duration < 15 for t in txs), [round(t.duration) for t in txs]

@@ -4,6 +4,11 @@ HFGCS is SSB voice over a steady noise floor, so a relative-energy squelch
 works well: track the noise floor while closed, open when short-term energy
 rises OPEN_DB above it, close after HANG_S below CLOSE_DB. Hysteresis plus a
 long hang keeps an EAM (with its pauses between character groups) in one piece.
+
+The floor is frozen while open, so if the background noise rises mid-transmission
+the level never falls back below it. A transmission that runs to MAX_TX_S is
+taken as a sign of that: the floor is re-measured from the last few seconds
+instead of reopening straight away on the same noise.
 """
 from __future__ import annotations
 
@@ -15,6 +20,7 @@ from typing import Callable, Optional
 import numpy as np
 
 FRAME_MS = 20
+RESEED_FRAMES = 500         # 10 s of recent levels to re-measure a stale floor from
 
 
 @dataclass
@@ -53,6 +59,7 @@ class Segmenter:
         self.level_db: float = -120.0
         self.is_open = False
         self._frames: list[np.ndarray] = []
+        self._open_db: collections.deque[float] = collections.deque(maxlen=RESEED_FRAMES)
         self._below = 0
         self._peak = -120.0
         self._t0 = 0.0
@@ -97,13 +104,18 @@ class Segmenter:
             return
 
         self._frames.append(frame)
+        self._open_db.append(db)
         self._peak = max(self._peak, level)
         if level < self.floor_db + self.close_db:
             self._below += 1
         else:
             self._below = 0
-        if self._below >= self.hang_frames or len(self._frames) >= self.max_frames:
+        if self._below >= self.hang_frames:
             self._close()
+        elif len(self._frames) >= self.max_frames:
+            self._close()
+            # ran to the limit: the floor is probably stale, so re-measure it
+            self.floor_db = float(np.median(self._open_db))
 
     def _open(self, frame: np.ndarray) -> None:
         self.is_open = True
@@ -112,6 +124,7 @@ class Segmenter:
         self._frames = pre + [frame]
         self._t0 = self.clock() - len(self._frames) * FRAME_MS / 1000.0
         self._below = 0
+        self._open_db.clear()
         self._peak = self.level_db
 
     def _close(self) -> None:
