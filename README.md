@@ -31,7 +31,8 @@ comes in.
 - **Strategic aircraft.** E-6B Mercury, E-4B Nightwatch, B-52H, B-2 and WC-135 on
   a map whenever public ADS-B receivers hear them.
 - **Notifications.** Browser push (or an [ntfy](https://ntfy.sh) topic) for every
-  new EAM, even with the tab closed.
+  new EAM, even with the tab closed, and an optional email when an E-4B
+  Nightwatch shows up on ADS-B.
 - **Archive.** EAMs, Skykings and other voice traffic with their recordings,
   per-character timestamps and full transcripts.
 
@@ -66,7 +67,8 @@ cp .env.example .env        # set KIWI_HOSTS=host:port[,host:port...]
 docker compose up --build   # then open http://localhost:8000
 ```
 
-**Without Docker** (needs Python 3.11+ and ffmpeg on your `PATH`):
+**Without Docker** (needs Python 3.11 to 3.14 and ffmpeg on your `PATH`; faster-whisper's
+dependencies don't install on 3.15 yet):
 
 ```sh
 git clone --depth 1 https://github.com/jks-prv/kiwiclient.git /opt/kiwiclient
@@ -154,7 +156,7 @@ can be slowed to 0.75×, and the message is read twice. **Check my copy** marks
 each character against the reference (the machine's copy plus crowd
 corrections) and gives a score over the characters anyone knows. If you filled
 in a position nobody has copied yet, you can send it in as a correction. The
-trainer runs entirely in the browser, so it works on the demo site too.
+trainer runs entirely in the browser, so it also works in the static demo build.
 
 ### Strategic aircraft
 
@@ -194,6 +196,13 @@ time.
   `voter.salt` (replacing it lets everyone vote again).
 - **Use several receivers.** Public Kiwis drop users for time limits and full
   slots. List several in `KIWI_HOSTS` and Skywatch rotates through them.
+- **Size the server for Whisper.** `small.en` needs about 1.1 GB of RAM, so 2 GB
+  is the minimum. With Whisper's voice detection off (the default), every
+  transmission is transcribed in full, which can take longer than the audio
+  itself on a single cloud vCPU; use at least 2.
+- **Example setup.** https://skywatch.zkm.tw runs on a 2 vCPU / 2 GB
+  DigitalOcean droplet. [`deploy/`](deploy/) has its Docker Compose file, Caddy
+  config, auto-deploy and nightly backup scripts, and notes for rebuilding it.
 
 ## Development
 
@@ -231,6 +240,8 @@ app/
 web/              UI (no build step): app.js, trainer.js, aircraft.js, notify.js, sw.js
 tools/            test audio, demo seeding, static demo build
 tests/            pytest suite
+deploy/           production server files (compose, Caddy, auto-deploy, backups)
+docs/             screenshot and the link-preview card source
 ```
 
 ### Tuning
@@ -239,8 +250,10 @@ tests/            pytest suite
   interference opens the squelch, raise `SQUELCH_OPEN_DB`.
 - **Split EAMs:** `SQUELCH_HANG_S` must be longer than the pauses between
   character groups, or one EAM gets cut into several transmissions.
-- **Whisper model:** `small.en` runs near real time on a few CPU cores.
-  `medium.en`, or `WHISPER_DEVICE=cuda`, copies noticeably better on weak signals.
+- **Whisper model:** `small.en` takes roughly as long as the audio on one fast
+  CPU core, and longer on a cloud vCPU; transmissions queue during busy periods.
+  `medium.en`, or `WHISPER_DEVICE=cuda`, copies noticeably better on weak signals
+  but needs more CPU (or a GPU).
 
 ## API
 
