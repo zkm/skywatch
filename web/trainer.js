@@ -73,7 +73,10 @@ $("tr-grid").addEventListener("paste", (e) => {
 
 function trClearMarks() {
   trainer.checked = false;
-  $("tr-grid").querySelectorAll(".tr-cell").forEach((c) => { c.classList.remove("ok", "bad", "miss", "nokey"); delete c.dataset.ref; });
+  $("tr-grid").querySelectorAll(".tr-cell").forEach((c, i) => {
+    c.classList.remove("ok", "bad", "miss", "nokey"); delete c.dataset.ref;
+    c.querySelector("input").setAttribute("aria-label", `Character ${i + 1}`);
+  });
   $("tr-result").hidden = true;
   $("tr-score").textContent = "";
   $("tr-share").hidden = true;
@@ -86,14 +89,19 @@ function trCheck() {
     const cell = el.parentElement, mine = el.value, want = ref[i];
     cell.classList.remove("ok", "bad", "miss", "nokey");
     delete cell.dataset.ref;
+    const n = `Character ${i + 1}`;
     if (want === "?") {                       // nobody knows this one yet
       cell.classList.add("nokey");
+      el.setAttribute("aria-label", `${n}: not known to anyone yet`);
       if (/^[A-Z0-9]$/.test(mine)) helped++;
       return;
     }
     known++;
-    if (mine === want) { right++; cell.classList.add("ok"); }
-    else { cell.classList.add(mine ? "bad" : "miss"); cell.dataset.ref = want; }
+    if (mine === want) { right++; cell.classList.add("ok"); el.setAttribute("aria-label", `${n}: correct`); }
+    else {
+      cell.classList.add(mine ? "bad" : "miss"); cell.dataset.ref = want;
+      el.setAttribute("aria-label", mine ? `${n}: you wrote ${mine}, it was ${want}` : `${n}: missed, it was ${want}`);
+    }
   });
   trainer.checked = true;
   const pct = known ? Math.round((100 * right) / known) : 0;

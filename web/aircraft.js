@@ -43,10 +43,12 @@ function renderAirTable(snap) {
   $("air-meta").textContent = airMeta(snap);
   const list = [...snap.aircraft].sort((a, b) => b.seen_at - a.seen_at);
   $("air-rows").innerHTML = list.length
-    ? list.map((a) => `<tr data-hex="${esc(a.hex)}" tabindex="0">
-        <td>${esc(a.label)}</td><td class="code">${esc(a.callsign || "—")}</td><td>${esc(a.reg || "—")}</td>
-        <td class="num">${altText(a)}</td><td class="num">${a.gs != null ? `${Math.round(a.gs)} kt` : "—"}</td>
-        <td class="num">${a.lat == null ? "no position · " : ""}${ago(a.seen_at)}</td></tr>`).join("")
+    ? list.map((a) => `<tr data-hex="${esc(a.hex)}">
+        <td>${a.lat == null ? esc(a.label)    // nothing to show on the map
+          : `<button type="button" class="rowbtn" aria-label="${esc(a.label)}, show on map">${esc(a.label)}</button>`}</td>
+        <td class="code" data-label="Callsign">${esc(a.callsign || "—")}</td><td data-label="Tail">${esc(a.reg || "—")}</td>
+        <td class="num" data-label="Altitude">${altText(a)}</td><td class="num" data-label="Speed">${a.gs != null ? `${Math.round(a.gs)} kt` : "—"}</td>
+        <td class="num" data-label="Heard">${a.lat == null ? "no position · " : ""}${ago(a.seen_at)}</td></tr>`).join("")
     : `<tr class="empty-row"><td colspan="6">${DEMO
       ? "None of the watched aircraft were being heard when this snapshot was taken. A running Skywatch server updates this every 30 seconds."
       : "None of the watched aircraft are being heard right now. They often fly without broadcasting, so check back later."}</td></tr>`;
@@ -117,9 +119,6 @@ $("air-rows").addEventListener("click", (e) => {
   const tr = e.target.closest("tr[data-hex]");
   const l = tr && air.layers.get(tr.dataset.hex);
   if (l && air.map) { air.map.setView(l.marker.getLatLng(), Math.max(air.map.getZoom(), 6)); l.marker.openPopup(); }
-});
-$("air-rows").addEventListener("keydown", (e) => {
-  if (e.key === "Enter") e.target.closest("tr[data-hex]")?.click();
 });
 
 hooks.aircraft = (snap) => renderAir(snap);
