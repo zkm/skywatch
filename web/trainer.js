@@ -28,7 +28,8 @@ function trLoad(m) {
   const p = $("tr-player");
   p.src = `audio/${m.audio}`;
   p.playbackRate = +$("tr-rate").value;
-  $("tr-meta").textContent = `Recorded ${zTime(m.started_at)}${m.callsign ? ` from ${m.callsign}` : ""} · ${trainer.ref.length} characters`;
+  $("tr-meta").textContent = `Recorded ${zTime(m.started_at)}${m.callsign ? ` from ${m.callsign}` : ""} · ${trainer.ref.length} characters`
+    + (credit(m) ? ` · ${credit(m)}` : "");
   const grid = $("tr-grid");
   grid.innerHTML = "";
   [...trainer.ref].forEach((_, i) => {
