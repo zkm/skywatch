@@ -9,7 +9,7 @@ characters the machine missed, practise copying for themselves, follow
 strategic aircraft on public ADS-B, and get a notification when a new EAM
 comes in.
 
-**[Try the demo →](https://zkm.github.io/skywatch/)** (sample data; run Skywatch yourself for live audio)
+**[Listen live →](https://skywatch.zkm.tw)**
 
 ![Skywatch copy pad: a 30-character EAM with two positions corrected by listeners and the correction editor open](docs/screenshot.png)
 
@@ -207,10 +207,10 @@ python -m pytest -q
 `EAM_SOURCE=file` also takes a real recording, which is the easiest way to tune
 the squelch and choose a Whisper model size.
 
-**Demo site.** Every push to `main` runs the tests, builds a static copy of the
-UI with the sample data and an ADS-B snapshot, and deploys it to GitHub Pages
-(`.github/workflows/ci.yml`). Build it locally with
-`python tools/build_pages.py _site`.
+**Static demo.** `python tools/build_pages.py _site` builds a static copy of the
+UI with the sample data and an ADS-B snapshot, for hosting anywhere without a
+server (no live audio, voting or push). It's no longer published automatically;
+the live site at https://skywatch.zkm.tw replaced it.
 
 **Layout**
 
@@ -227,7 +227,7 @@ app/
   push.py         Web Push and ntfy
   store.py        SQLite
 web/              UI (no build step): app.js, trainer.js, aircraft.js, notify.js, sw.js
-tools/            test audio, demo seeding, Pages build
+tools/            test audio, demo seeding, static demo build
 tests/            pytest suite
 ```
 
