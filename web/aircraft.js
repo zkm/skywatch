@@ -110,6 +110,12 @@ async function airOpen() {
       maxZoom: 12,
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors · positions: <a href="https://adsb.lol">adsb.lol</a>',
     }).addTo(air.map);
+    // attribution links (Leaflet, OpenStreetMap, adsb.lol) open in a new tab, like the site's other external links
+    air.map.getContainer().querySelectorAll(".leaflet-control-attribution a[href^='http']").forEach((a) => {
+      a.target = "_blank";
+      a.rel = "noopener";
+      a.insertAdjacentHTML("beforeend", '<span class="sr-only"> (opens in a new tab)</span>');
+    });
   }
   air.map.invalidateSize();     // the tab was hidden when the container was laid out
   if (air.snap) renderMap(air.snap);
