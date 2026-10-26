@@ -269,6 +269,19 @@ tests/            pytest suite
 - Transcription: [faster-whisper](https://github.com/SYSTRAN/faster-whisper).
 - Inspired by [missileer.watch](https://missileer.watch).
 
+**Background reading** on HFGCS, EAMs and Skykings:
+
+- Ashton B. Carter, "The Command and Control of Nuclear War," *Scientific American* 252,
+  no. 1 (January 1985): 32–39.
+- U.S. Air Force, Grand Forks AFB, ["319th CS hosts High Frequency Global Communications
+  System open house"](https://www.grandforks.af.mil/News/Display/Article/3415740/) (2 June 2023):
+  HFGCS is an Air Force system operated from Grand Forks AFB and Joint Base Andrews.
+- Number Stations Research, ["The HF-GCS and Emergency Action Messages"](https://www.numbers-stations.com/usa/hfgcs/):
+  the network, its sites and frequencies, and the Skyking format.
+- Listener references: [Priyom](https://priyom.org/military-stations/united-states/hfgcs),
+  [NEET INTEL's HFGCS FAQ](https://neetintel.github.io/hfgcs_faq.html) and Milcom Monitoring
+  Post's ["What are Emergency Action Messages?"](https://mt-milcom.blogspot.com/p/what-is-emergency-action-message-or-eam.html)
+
 ## License
 
 [MIT](LICENSE). To report a security problem, see [SECURITY.md](SECURITY.md).
