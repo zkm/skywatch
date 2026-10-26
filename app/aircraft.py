@@ -65,10 +65,12 @@ def pick(feed: dict, now: float) -> list[dict[str, Any]]:
 
 
 class AircraftWatch:
-    def __init__(self, url: str, poll_s: float, on_update: Callable[[dict], None]) -> None:
+    def __init__(self, url: str, poll_s: float, on_update: Callable[[dict], None],
+                 on_appear: Optional[Callable[[dict], None]] = None) -> None:
         self.url = url
         self.poll_s = poll_s
         self.on_update = on_update
+        self.on_appear = on_appear   # called once per aircraft when it is first heard
         self._known: dict[str, dict] = {}
         self._trails: dict[str, collections.deque] = {}
         self._snapshot: dict[str, Any] = {"updated_at": None, "source": url, "error": None,
@@ -96,6 +98,8 @@ class AircraftWatch:
 
     def update(self, feed: dict, now: float) -> dict[str, Any]:
         for ac in pick(feed, now):
+            if ac["hex"] not in self._known and self.on_appear:
+                self.on_appear(ac)
             self._known[ac["hex"]] = ac
             if ac["lat"] is not None and ac["lon"] is not None:
                 trail = self._trails.setdefault(ac["hex"], collections.deque(maxlen=TRAIL_POINTS))

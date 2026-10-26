@@ -79,6 +79,14 @@ class Config:
     # mailto:you@example.com or https://your.host (no path). Browser push is off until set.
     push_subject: str = field(default_factory=lambda: _env("PUSH_SUBJECT", ""))
     ntfy_url: str = field(default_factory=lambda: _env("NTFY_URL", ""))  # e.g. https://ntfy.sh/your-topic
+    # email when an E-4B is first heard on ADS-B; off until ALERT_EMAIL_TO and SMTP_HOST are set
+    alert_email_to: list[str] = field(
+        default_factory=lambda: [a.strip() for a in _env("ALERT_EMAIL_TO", "").split(",") if a.strip()])
+    smtp_host: str = field(default_factory=lambda: _env("SMTP_HOST", ""))
+    smtp_port: int = field(default_factory=lambda: int(_env("SMTP_PORT", "587")))  # 465 = implicit TLS
+    smtp_user: str = field(default_factory=lambda: _env("SMTP_USER", ""))
+    smtp_password: str = field(default_factory=lambda: _env("SMTP_PASSWORD", ""))
+    smtp_from: str = field(default_factory=lambda: _env("SMTP_FROM", ""))   # defaults to SMTP_USER
 
     # --- strategic aircraft (ADS-B) ---
     adsb_enabled: bool = field(default_factory=lambda: _env("ADSB_ENABLED", "1") == "1")

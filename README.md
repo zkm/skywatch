@@ -115,6 +115,9 @@ starting point.
 | `PUSH_SUBJECT` | | Required for browser push: `mailto:you@example.com` or `https://your.host` (no path) |
 | `PUSH_KINDS` | `eam` | What notifies: any of `eam`, `skyking`, `voice` |
 | `NTFY_URL` | | Also post each message to an ntfy topic, e.g. `https://ntfy.sh/your-topic` |
+| `ALERT_EMAIL_TO` | | Email these addresses (comma-separated) when an E-4B is first heard on ADS-B |
+| `SMTP_HOST` / `SMTP_PORT` | / `587` | Mail server for those emails; STARTTLS on 587, implicit TLS on 465 |
+| `SMTP_USER` / `SMTP_PASSWORD` / `SMTP_FROM` | | Login, and the sender address (defaults to `SMTP_USER`) |
 | `ADSB_ENABLED` / `ADSB_URL` / `ADSB_POLL_S` | `1` / adsb.lol military feed / `30` | Any ADSBExchange-v2-style feed |
 
 **Server**
@@ -170,6 +173,10 @@ time.
 - **HTTPS** is required for push anywhere except localhost.
 - **ntfy:** set `NTFY_URL` to send the same alerts to an ntfy topic, for people
   who'd rather use that app.
+- **E-4B email:** set `ALERT_EMAIL_TO` and the `SMTP_*` variables to get an
+  email when an E-4B Nightwatch shows up on ADS-B. It's sent once per sighting:
+  an aircraft has to be gone for 15 minutes before it can alert again. A server
+  restart also counts as a new sighting.
 
 ## Deploying
 
@@ -250,7 +257,6 @@ tests/            pytest suite
 
 ## Roadmap
 
-- An email alert when the E-4B appears.
 - A Whisper model tuned on HF voice, to cut down the `?`s.
 
 ## Credits

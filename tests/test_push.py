@@ -1,6 +1,6 @@
 import base64
 
-from app.push import Notifier, describe, valid_subscription
+from app.push import Mailer, Notifier, describe, describe_aircraft, valid_subscription
 from app.store import Store
 
 EAM = {"id": 3, "kind": "eam", "started_at": 1792800000, "callsign": "Andrews",
@@ -53,3 +53,70 @@ def test_push_stays_off_without_subject(tmp_path):
     assert not n.enabled and n.public_key is None
     assert not (tmp_path / "vapid.pem").exists()
     n.message(EAM)      # no subscribers, no ntfy: nothing to do, must not raise
+
+
+E4B = {"hex": "adfeb5", "label": "E-4B Nightwatch", "type": "B742", "reg": "74-0787",
+       "callsign": "GORDO21", "lat": 40.6331, "lon": -88.5770, "alt": 24000, "gs": 253.4,
+       "track": 274.0, "squawk": "6703", "seen_at": 1792800000}
+
+
+def test_describe_aircraft():
+    subject, body = describe_aircraft(E4B)
+    assert subject == "E-4B Nightwatch 74-0787 is up"
+    assert "at 2026-10-24 00:00Z." in body
+    assert "Altitude:  24,000 ft" in body and "Speed:     253 kt" in body
+    assert "Position:  40.633, -88.577" in body
+    assert body.endswith("https://globe.adsb.lol/?icao=adfeb5")
+    _, body = describe_aircraft({**E4B, "lat": None, "lon": None, "alt": "ground", "gs": None,
+                                 "reg": None, "callsign": None})
+    assert "Position:  not broadcast" in body and "Altitude:  on the ground" in body
+    assert "Speed:     -" in body
+
+
+class FakeSMTP:
+    sent: list = []
+
+    def __init__(self, host, port, timeout):
+        self.tls = False
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+    def ehlo(self):
+        pass
+
+    def has_extn(self, name):
+        return name == "starttls"
+
+    def starttls(self, context):
+        self.tls = True
+
+    def login(self, user, password):
+        assert self.tls, "logged in before STARTTLS"
+
+    def send_message(self, msg):
+        FakeSMTP.sent.append(msg)
+
+
+def test_notifier_emails_only_for_e4b(tmp_path, monkeypatch):
+    monkeypatch.setattr("smtplib.SMTP", FakeSMTP)
+    FakeSMTP.sent = []
+    mailer = Mailer("smtp.example", 587, "me@example.com", "pw", "", ["a@example.com", "b@example.com"])
+    n = Notifier(Store(tmp_path / "db.sqlite3"), {"eam"}, tmp_path / "vapid.pem", "", mailer=mailer)
+    n.aircraft(E4B)
+    n.aircraft({**E4B, "label": "B-52H Stratofortress"})
+    n._pool.shutdown(wait=True)
+    assert len(FakeSMTP.sent) == 1
+    msg = FakeSMTP.sent[0]
+    assert msg["Subject"] == "E-4B Nightwatch 74-0787 is up"
+    assert msg["From"] == "me@example.com" and msg["To"] == "a@example.com, b@example.com"
+
+
+def test_mailer_off_without_recipients(tmp_path):
+    n = Notifier(Store(tmp_path / "db.sqlite3"), {"eam"}, tmp_path / "vapid.pem", "",
+                 mailer=Mailer("smtp.example", 587, "me@example.com", "pw", "", []))
+    assert n.mailer is None
+    n.aircraft(E4B)     # must not raise

@@ -1,4 +1,5 @@
-"""Notifications for new messages: browser Web Push (VAPID) and an optional ntfy topic.
+"""Notifications for new messages: browser Web Push (VAPID) and an optional ntfy topic,
+plus an email when an E-4B is first heard on ADS-B.
 
 pywebpush is imported lazily so the rest of the app (and the tests) run without it.
 Sends happen on a small thread pool so a slow push service never holds up ASR.
@@ -8,9 +9,12 @@ from __future__ import annotations
 import base64
 import json
 import logging
+import smtplib
+import ssl
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
+from email.message import EmailMessage
 from pathlib import Path
 from typing import Any, Optional
 
@@ -18,6 +22,7 @@ log = logging.getLogger("skywatch.push")
 
 TTL_S = 6 * 3600   # how long a push service holds a message for an offline device
 MAX_FIELD = 512    # subscription fields are short; reject anything silly
+EMAIL_LABELS = {"E-4B Nightwatch"}   # aircraft that trigger an email when first heard
 
 
 def describe(m: dict[str, Any]) -> dict[str, Any]:
@@ -38,6 +43,66 @@ def describe(m: dict[str, Any]) -> dict[str, Any]:
         title = "HFGCS traffic"
         text = f"Voice traffic{who} at {when}"
     return {"title": title, "body": text, "id": m["id"], "kind": m["kind"], "url": "./#monitor"}
+
+
+def describe_aircraft(a: dict[str, Any]) -> tuple[str, str]:
+    """Email subject and body for an aircraft that just appeared on ADS-B."""
+    when = datetime.fromtimestamp(a["seen_at"], timezone.utc).strftime("%Y-%m-%d %H:%MZ")
+    name = " ".join(x for x in (a["label"], a.get("reg")) if x)
+    alt = a.get("alt")
+    if alt == "ground":
+        alt = "on the ground"
+    elif alt is not None:
+        alt = f"{alt:,} ft"
+    gs = f"{round(a['gs'])} kt" if a.get("gs") is not None else None
+    pos = f"{a['lat']:.3f}, {a['lon']:.3f}" if a.get("lat") is not None else "not broadcast"
+    body = "\n".join([
+        f"{name} was heard on public ADS-B at {when}.",
+        "",
+        f"Callsign:  {a.get('callsign') or '-'}",
+        f"Altitude:  {alt or '-'}",
+        f"Speed:     {gs or '-'}",
+        f"Position:  {pos}",
+        f"Squawk:    {a.get('squawk') or '-'}",
+        "",
+        f"Track it: https://globe.adsb.lol/?icao={a['hex']}",
+    ])
+    return f"{name} is up", body
+
+
+class Mailer:
+    """Sends plain-text email over SMTP: STARTTLS on 587/25, implicit TLS on 465."""
+
+    def __init__(self, host: str, port: int, user: str, password: str, sender: str,
+                 to: list[str]) -> None:
+        self.host, self.port, self.user, self.password = host, port, user, password
+        self.sender = sender or user
+        self.to = to
+
+    @property
+    def enabled(self) -> bool:
+        return bool(self.host and self.to and self.sender)
+
+    def send(self, subject: str, body: str) -> None:
+        msg = EmailMessage()
+        msg["Subject"], msg["From"], msg["To"] = subject, self.sender, ", ".join(self.to)
+        msg.set_content(body)
+        ctx = ssl.create_default_context()
+        if self.port == 465:
+            smtp = smtplib.SMTP_SSL(self.host, self.port, timeout=20, context=ctx)
+        else:
+            smtp = smtplib.SMTP(self.host, self.port, timeout=20)
+        with smtp:
+            if self.port != 465:
+                smtp.ehlo()
+                if smtp.has_extn("starttls"):
+                    smtp.starttls(context=ctx)
+                    smtp.ehlo()
+                elif self.user:
+                    raise RuntimeError(f"{self.host} doesn't offer STARTTLS; not sending the password in the clear")
+            if self.user:
+                smtp.login(self.user, self.password)
+            smtp.send_message(msg)
 
 
 def _b64url_len(s: str) -> int:
@@ -66,11 +131,12 @@ def valid_subscription(sub: Any) -> Optional[dict[str, str]]:
 
 class Notifier:
     def __init__(self, store, kinds: set[str], vapid_path: Path, subject: str,
-                 ntfy_url: str = "") -> None:
+                 ntfy_url: str = "", mailer: Optional[Mailer] = None) -> None:
         self.store = store
         self.kinds = kinds
         self.subject = subject
         self.ntfy_url = ntfy_url
+        self.mailer = mailer if mailer and mailer.enabled else None
         self._pool = ThreadPoolExecutor(max_workers=4, thread_name_prefix="push")
         self._vapid = None
         self.public_key: Optional[str] = None
@@ -117,6 +183,11 @@ class Notifier:
         if self.ntfy_url:
             self._pool.submit(self._ntfy, payload)
 
+    def aircraft(self, a: dict[str, Any]) -> None:
+        """Called from the aircraft thread when a watched aircraft is first heard."""
+        if self.mailer and a["label"] in EMAIL_LABELS:
+            self._pool.submit(self._email, *describe_aircraft(a))
+
     def confirm(self, sub: dict[str, str]) -> None:
         """First push right after subscribing, so people know it works."""
         self._pool.submit(self._send, sub, {
@@ -149,3 +220,10 @@ class Notifier:
             urllib.request.urlopen(req, timeout=15).close()
         except Exception as e:
             log.warning("ntfy failed: %s", e)
+
+    def _email(self, subject: str, body: str) -> None:
+        try:
+            self.mailer.send(subject, body)
+            log.info("emailed alert: %s", subject)
+        except Exception as e:
+            log.warning("alert email failed: %s", e)
