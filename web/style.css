@@ -152,6 +152,8 @@ main { max-width: 1120px; margin: 0 auto; padding: 0 clamp(16px, 4vw, 40px); }
 .guide dt { font-weight: 700; }
 .guide dd { margin: 2px 0 0; color: var(--ink-soft); }
 abbr[title] { text-decoration: underline dotted; cursor: help; }
+/* external links open in a new tab; the arrow is decorative (the link text says so to screen readers) */
+a[target="_blank"]::after { content: "\2197" / ""; margin-left: 2px; font-size: 0.85em; }
 
 /* --- copy pad (the hero) --- */
 .pad { padding: 36px 0 28px; border-bottom: 1px solid var(--rule); }
