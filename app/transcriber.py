@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from typing import Protocol
 
 import numpy as np
@@ -12,18 +13,26 @@ from .phonetic import Word
 log = logging.getLogger("skywatch.asr")
 
 # Biases Whisper toward the HFGCS vocabulary instead of "Charlie" -> "Charley" etc.
-PROMPT = (
-    "All stations, all stations, this is Andrews, Andrews. "
-    "Alpha Bravo Charlie Delta Echo Foxtrot, stand by. "
-    "Message follows. Golf Hotel India Juliet Kilo Lima Mike November Oscar Papa "
-    "Quebec Romeo Sierra Tango Uniform Victor Whiskey X-ray Yankee Zulu "
-    "Zero One Two Three Four Five Six Seven Eight Niner. I say again. "
-    "Skyking, Skyking, do not answer. Time two five. Authentication Papa Sierra. "
-    "This is Offutt, out."
-)
+# (No initial_prompt: on long stretches of noise Whisper recites the prompt back,
+# which produced fake "Skyking, Skyking, do not answer" messages.)
 HOTWORDS = ("Alpha Bravo Charlie Delta Echo Foxtrot Golf Hotel India Juliet Kilo Lima "
             "Mike November Oscar Papa Quebec Romeo Sierra Tango Uniform Victor Whiskey "
             "X-ray Yankee Zulu Niner Skyking")
+
+
+FILLER = {"mm", "hmm", "mhm", "shh", "uh", "um", "ah", "oh", "the", "a"}
+# stock phrases Whisper produces from noise (learned from video captions)
+STOCK = ("thank you for watching", "thanks for watching", "subscribe", "see you next time",
+         "please like", "bon appetit")
+
+
+def looks_like_noise(text: str) -> bool:
+    """True for transcripts that are Whisper hallucinating on noise rather than voice traffic."""
+    t = text.lower()
+    if any(p in t for p in STOCK):
+        return True
+    words = {w for w in re.findall(r"[a-z0-9]+(?:-[a-z0-9]+)*", t) if w not in FILLER}
+    return len(words) <= 3      # "Shh Shh Shh", "Mm hmm. Z-ray Yankee Zulu"
 
 
 class Transcriber(Protocol):
@@ -46,8 +55,8 @@ class WhisperTranscriber:
             language="en",
             beam_size=5,
             word_timestamps=True,
-            initial_prompt=PROMPT,
             hotwords=HOTWORDS,
+            hallucination_silence_threshold=2.0,   # skip text Whisper invents over silent stretches
             condition_on_previous_text=False,   # avoids runaway repetition on long EAMs
             vad_filter=self.vad,
             vad_parameters={"min_silence_duration_ms": 1500} if self.vad else None,
