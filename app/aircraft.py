@@ -19,7 +19,6 @@ log = logging.getLogger("skywatch.aircraft")
 WATCH_TYPES = {
     "E6": "E-6B Mercury",
     "E4B": "E-4B Nightwatch",
-    "B742": "E-4B Nightwatch",   # only in the military feed; civil 747-200s don't appear there
     "B52": "B-52H Stratofortress",
     "B2": "B-2 Spirit",
     "C135": "WC-135 / OC-135",
@@ -35,7 +34,12 @@ def label_for(ac: dict) -> Optional[str]:
     reg = (ac.get("r") or "").strip()
     if reg in WATCH_REGS:
         return WATCH_REGS[reg]
-    return WATCH_TYPES.get((ac.get("t") or "").strip().upper())
+    typ = (ac.get("t") or "").strip().upper()
+    # Feeds often type the E-4B as a plain 747-200 (B742), but so are the VC-25A
+    # "Air Force One" jets (82-8000, 92-9000). Trust B742 only when there's no tail.
+    if typ == "B742":
+        return None if reg else "E-4B Nightwatch"
+    return WATCH_TYPES.get(typ)
 
 
 def pick(feed: dict, now: float) -> list[dict[str, Any]]:
