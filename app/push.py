@@ -10,6 +10,7 @@ import base64
 import json
 import logging
 import smtplib
+import time
 import ssl
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
@@ -23,6 +24,7 @@ log = logging.getLogger("skywatch.push")
 TTL_S = 6 * 3600   # how long a push service holds a message for an offline device
 MAX_FIELD = 512    # subscription fields are short; reject anything silly
 EMAIL_LABELS = {"E-4B Nightwatch"}   # aircraft that trigger an email when first heard
+ALERT_QUIET_S = 6 * 3600             # at most one email per aircraft in this window, restarts included
 
 
 def describe(m: dict[str, Any]) -> dict[str, Any]:
@@ -185,8 +187,10 @@ class Notifier:
 
     def aircraft(self, a: dict[str, Any]) -> None:
         """Called from the aircraft thread when a watched aircraft is first heard."""
-        if self.mailer and a["label"] in EMAIL_LABELS:
-            self._pool.submit(self._email, *describe_aircraft(a))
+        key = f"aircraft:{a['hex']}"
+        if (self.mailer and a["label"] in EMAIL_LABELS
+                and self.store.claim_alert(key, time.time(), ALERT_QUIET_S)):
+            self._pool.submit(self._email, key, *describe_aircraft(a))
 
     def confirm(self, sub: dict[str, str]) -> None:
         """First push right after subscribing, so people know it works."""
@@ -221,9 +225,10 @@ class Notifier:
         except Exception as e:
             log.warning("ntfy failed: %s", e)
 
-    def _email(self, subject: str, body: str) -> None:
+    def _email(self, key: str, subject: str, body: str) -> None:
         try:
             self.mailer.send(subject, body)
             log.info("emailed alert: %s", subject)
         except Exception as e:
+            self.store.release_alert(key)
             log.warning("alert email failed: %s", e)

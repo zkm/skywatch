@@ -42,6 +42,10 @@ CREATE TABLE IF NOT EXISTS corrections (
     created_at REAL NOT NULL,
     UNIQUE (message_id, pos, voter)      -- re-voting replaces your earlier vote
 );
+CREATE TABLE IF NOT EXISTS alerts (
+    key        TEXT PRIMARY KEY,         -- what was alerted on, e.g. "aircraft:adfeb5"
+    sent_at    REAL NOT NULL             -- so restarts don't repeat recent alerts
+);
 CREATE TABLE IF NOT EXISTS push_subscriptions (
     endpoint   TEXT PRIMARY KEY,         -- browser push service URL
     p256dh     TEXT NOT NULL,
@@ -160,6 +164,23 @@ class Store:
         with self._lock:
             return [dict(r) for r in self._db.execute(
                 "SELECT endpoint, p256dh, auth FROM push_subscriptions")]
+
+    def claim_alert(self, key: str, now: float, quiet_s: float) -> bool:
+        """True (and records it) unless `key` was already alerted within `quiet_s`."""
+        with self._lock:
+            r = self._db.execute("SELECT sent_at FROM alerts WHERE key = ?", (key,)).fetchone()
+            if r and r["sent_at"] > now - quiet_s:
+                return False
+            self._db.execute("INSERT INTO alerts (key, sent_at) VALUES (?, ?) ON CONFLICT (key) "
+                             "DO UPDATE SET sent_at = excluded.sent_at", (key, now))
+            self._db.commit()
+        return True
+
+    def release_alert(self, key: str) -> None:
+        """Forget a claimed alert that couldn't be sent, so the next sighting retries."""
+        with self._lock:
+            self._db.execute("DELETE FROM alerts WHERE key = ?", (key,))
+            self._db.commit()
 
     def counts(self) -> dict[str, int]:
         with self._lock:

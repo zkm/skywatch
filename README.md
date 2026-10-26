@@ -174,9 +174,9 @@ time.
 - **ntfy:** set `NTFY_URL` to send the same alerts to an ntfy topic, for people
   who'd rather use that app.
 - **E-4B email:** set `ALERT_EMAIL_TO` and the `SMTP_*` variables to get an
-  email when an E-4B Nightwatch shows up on ADS-B. It's sent once per sighting:
-  an aircraft has to be gone for 15 minutes before it can alert again. A server
-  restart also counts as a new sighting.
+  email when an E-4B Nightwatch shows up on ADS-B. Each aircraft alerts at most
+  once every 6 hours, across restarts too, so a plane that's flying while you
+  restart Skywatch doesn't send it again.
 
 ## Deploying
 

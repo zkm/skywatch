@@ -115,6 +115,41 @@ def test_notifier_emails_only_for_e4b(tmp_path, monkeypatch):
     assert msg["From"] == "me@example.com" and msg["To"] == "a@example.com, b@example.com"
 
 
+def test_alert_not_repeated_across_restarts(tmp_path, monkeypatch):
+    monkeypatch.setattr("smtplib.SMTP", FakeSMTP)
+    FakeSMTP.sent = []
+    db = tmp_path / "db.sqlite3"
+    mailer = Mailer("smtp.example", 587, "me@example.com", "pw", "", ["a@example.com"])
+    for _ in range(2):                  # same aircraft, server restarted in between
+        n = Notifier(Store(db), {"eam"}, tmp_path / "vapid.pem", "", mailer=mailer)
+        n.aircraft(E4B)
+        n._pool.shutdown(wait=True)
+    assert len(FakeSMTP.sent) == 1
+    n = Notifier(Store(db), {"eam"}, tmp_path / "vapid.pem", "", mailer=mailer)
+    n.aircraft({**E4B, "hex": "adfeb6", "reg": "75-0125"})   # a different E-4B still alerts
+    n._pool.shutdown(wait=True)
+    assert len(FakeSMTP.sent) == 2
+
+
+def test_failed_email_is_retried_on_next_sighting(tmp_path, monkeypatch):
+    class Down(FakeSMTP):
+        def send_message(self, msg):
+            raise OSError("connection reset")
+    monkeypatch.setattr("smtplib.SMTP", Down)
+    n = Notifier(Store(tmp_path / "db.sqlite3"), {"eam"}, tmp_path / "vapid.pem", "",
+                 mailer=Mailer("smtp.example", 587, "me@example.com", "pw", "", ["a@example.com"]))
+    n.aircraft(E4B)
+    n._pool.shutdown(wait=True)
+    assert n.store.claim_alert("aircraft:adfeb5", 0, 0)    # released, not stuck for 6 h
+
+
+def test_claim_alert_quiet_window(tmp_path):
+    s = Store(tmp_path / "db.sqlite3")
+    assert s.claim_alert("aircraft:x", 1000, 3600)
+    assert not s.claim_alert("aircraft:x", 1000 + 3599, 3600)
+    assert s.claim_alert("aircraft:x", 1000 + 3601, 3600)
+
+
 def test_mailer_off_without_recipients(tmp_path):
     n = Notifier(Store(tmp_path / "db.sqlite3"), {"eam"}, tmp_path / "vapid.pem", "",
                  mailer=Mailer("smtp.example", 587, "me@example.com", "pw", "", []))
