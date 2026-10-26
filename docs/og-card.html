@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Skywatch share card</title>
+<!-- Source for web/og-image.png (the link-preview image). Regenerate with:
+     chromium --headless=new --window-size=1200,630 --hide-scrollbars --virtual-time-budget=8000 \
+       --screenshot=web/og-image.png "file://$PWD/docs/og-card.html" -->
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..125,400..800&family=Martian+Mono:wght@400;600&display=block" rel="stylesheet">
+<style>
+  html, body { margin: 0; }
+  body {
+    width: 1200px; height: 630px; box-sizing: border-box; padding: 64px 72px;
+    background: #c9cec2; color: #1f2a2e; font-family: "Archivo", sans-serif;
+    display: flex; flex-direction: column; justify-content: space-between;
+    border-bottom: 10px solid #1f2a2e;
+  }
+  .top { display: flex; align-items: baseline; justify-content: space-between; }
+  .mark { font-size: 76px; font-weight: 800; font-variation-settings: "wdth" 125; letter-spacing: -0.01em; }
+  .freq { font-size: 64px; font-weight: 750; font-variation-settings: "wdth" 75; }
+  .freq small { font-size: 26px; font-weight: 500; color: #47524f; margin-left: 8px; }
+  .lede { font-size: 36px; line-height: 1.3; max-width: 980px; margin: 0; }
+  .cells { display: flex; gap: 12px; }
+  .cell {
+    width: 66px; height: 84px; display: grid; place-items: center;
+    background: #f2f4ee; border: 3px solid #1f2a2e; border-radius: 5px;
+    font: 600 40px/1 "Martian Mono", monospace;
+  }
+  .unk { color: #9a2b23; border-color: #9a2b23; border-style: dashed; }
+  .crowd { color: #24539a; border-color: #24539a; text-decoration: underline; text-underline-offset: 6px; }
+  .foot { display: flex; justify-content: space-between; align-items: baseline; font-size: 26px; color: #47524f; }
+  .foot b { color: #1f2a2e; }
+</style>
+</head>
+<body>
+  <div class="top">
+    <div class="mark">Skywatch</div>
+    <div class="freq">11175<small>kHz</small></div>
+  </div>
+  <p class="lede">Listen to the US Air Force's worldwide HF radio network, and help copy each Emergency Action Message as it's read.</p>
+  <div class="cells" aria-hidden="true">
+    <span class="cell">Q</span><span class="cell">X</span><span class="cell">7</span><span class="cell">R</span>
+    <span class="cell">T</span><span class="cell">Z</span><span class="cell">2</span><span class="cell">K</span>
+    <span class="cell unk">?</span><span class="cell">M</span><span class="cell crowd">9</span><span class="cell">B</span>
+    <span class="cell">W</span><span class="cell">C</span>
+  </div>
+  <div class="foot"><span>Live audio · EAM copies · strategic aircraft on ADS-B</span><b>skywatch.zkm.tw</b></div>
+</body>
+</html>
