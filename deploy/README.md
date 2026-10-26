@@ -1,6 +1,6 @@
 # Production deployment (skywatch.zkm.tw)
 
-Copies of the files installed on the `skywatch` DigitalOcean droplet (Ubuntu 24.04, 1 vCPU / 2 GB).
+Copies of the files installed on the `skywatch` DigitalOcean droplet (Ubuntu 24.04, 2 vCPU / 2 GB).
 Secrets are not here: they live only in `/opt/skywatch-deploy/skywatch.env` on the server.
 
 | File here | Installed at | What it does |
@@ -12,6 +12,12 @@ Secrets are not here: they live only in `/opt/skywatch-deploy/skywatch.env` on t
 | `skywatch-backup.cron` | `/etc/cron.d/skywatch-backup` | Runs the backup at 03:30 UTC |
 
 `/opt/skywatch` is a plain clone of this repo's `main`; the deploy script fast-forwards it.
+
+Production settings that differ from the defaults (in `skywatch.env`, not in git):
+`EAM_SOURCE=kiwi` with four directly-addressed North American KiwiSDRs in `KIWI_HOSTS`
+and `KIWI_USER=skywatch.zkm.tw`, plus `SQUELCH_OPEN_DB=6.5` / `SQUELCH_CLOSE_DB=5`:
+on the Kiwi feed idle noise stays within about 5 dB of the floor and weak HFGCS
+voice peaks around 9 dB, so the default 8 dB misses most of it.
 
 ## Day to day
 
