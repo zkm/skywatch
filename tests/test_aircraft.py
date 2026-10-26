@@ -31,3 +31,16 @@ def test_trails_grow_and_stale_aircraft_expire():
     assert any(a["hex"] == "ae0003" for a in snap["aircraft"])  # still within the window
     snap = w.update(moved, now=1030 + FORGET_AFTER_S + 10)
     assert [a["hex"] for a in snap["aircraft"]] == ["ae0001"]
+
+
+def test_on_appear_fires_once_per_sighting():
+    seen = []
+    w = AircraftWatch("http://example.invalid", 30, lambda s: None, seen.append)
+    w.update(FEED, now=1000)
+    assert sorted(a["hex"] for a in seen) == ["adfdf9", "ae0001", "ae0003"]
+    seen.clear()
+    w.update(FEED, now=1030)                                   # still up: no repeat
+    assert seen == []
+    w.update({"ac": []}, now=1030 + FORGET_AFTER_S + 10)      # forgotten...
+    w.update({"ac": [FEED["ac"][1]]}, now=1030 + FORGET_AFTER_S + 40)
+    assert [a["hex"] for a in seen] == ["adfdf9"]              # ...so it alerts again
