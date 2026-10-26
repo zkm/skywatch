@@ -19,6 +19,8 @@ const zTime = (epoch, withDate = true) => {
   const t = `${p(d.getUTCHours())}:${p(d.getUTCMinutes())}:${p(d.getUTCSeconds())}Z`;
   return withDate ? `${d.getUTCFullYear()}-${p(d.getUTCMonth() + 1)}-${p(d.getUTCDate())} ${t}` : t;
 };
+// recordings brought in with tools/import_audio.py carry their credit in `source`
+const credit = (m) => ((m.source || "").startsWith("import:") ? `recording: ${m.source.slice(7)}` : "");
 const dur = (s) => (s >= 60 ? `${Math.floor(s / 60)}m ${Math.round(s % 60)}s` : `${Math.round(s)}s`);
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 // machine copy with the crowd's changes marked
@@ -344,7 +346,7 @@ async function select(id) {
   $("pad-body").hidden = false;
   const label = { eam: "Emergency Action Message", skyking: "Skyking", voice: "Voice traffic" }[m.kind];
   $("pad-title").textContent = zTime(m.started_at);
-  $("pad-meta").textContent = [label, m.callsign && `from ${m.callsign}`, dur(m.duration)].filter(Boolean).join(", ");
+  $("pad-meta").textContent = [label, m.callsign && `from ${m.callsign}`, dur(m.duration), credit(m)].filter(Boolean).join(", ");
   player.src = `audio/${m.audio}`;
 
   const out = $("pad-copy");
