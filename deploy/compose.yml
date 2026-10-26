@@ -1,0 +1,27 @@
+# Production stack for skywatch.zkm.tw: Skywatch behind Caddy (automatic HTTPS).
+# Skywatch has no published port; only Caddy is reachable from outside.
+services:
+  skywatch:
+    build: /opt/skywatch
+    env_file: skywatch.env
+    environment:
+      DATA_DIR: /data
+      TRUST_PROXY: "1"
+    volumes:
+      - /var/lib/skywatch:/data
+    restart: unless-stopped
+  caddy:
+    image: caddy:2.8.4
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on: [skywatch]
+    restart: unless-stopped
+volumes:
+  caddy_data:
+  caddy_config:

@@ -1,0 +1,6 @@
+skywatch.zkm.tw {
+	# stream the live MP3 and SSE straight through, no buffering
+	reverse_proxy skywatch:8000 {
+		flush_interval -1
+	}
+}

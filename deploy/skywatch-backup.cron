@@ -1,0 +1,1 @@
+30 3 * * * root /usr/local/sbin/skywatch-backup >> /var/log/skywatch-backup.log 2>&1
