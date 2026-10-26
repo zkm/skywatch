@@ -55,7 +55,9 @@ reads. Anything it isn't sure of becomes `?`, with its best guesses kept for the
 
 You need one or more public KiwiSDR receivers with decent 11 MHz reception
 toward the HFGCS stations. Pick some from the [KiwiSDR map](http://kiwisdr.com/public/)
-that have free slots and no time limit.
+that have free slots and no time limit, and their own address (`host:port`, often
+port 8073). Receivers listed as `*.proxy.kiwisdr.com` don't work: the proxy accepts
+kiwirecorder's connection, then closes it about 10 seconds later.
 
 **With Docker:**
 

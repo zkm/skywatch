@@ -52,6 +52,11 @@ class KiwiSource:
     def __init__(self, cfg: Config, state: SourceState) -> None:
         if not cfg.kiwi_hosts:
             raise SystemExit("KIWI_HOSTS is empty; set e.g. KIWI_HOSTS=kiwi.example.org:8073")
+        for host, port in cfg.kiwi_hosts:
+            if host.endswith(".proxy.kiwisdr.com"):
+                # the proxy accepts kiwirecorder's connection, then closes it ~10 s after auth
+                log.warning("%s:%s is behind the kiwisdr.com proxy, which kiwirecorder can't use; "
+                            "pick receivers with their own host:port", host, port)
         self.cfg = cfg
         self.state = state
         self._stop = threading.Event()
