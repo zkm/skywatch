@@ -101,7 +101,7 @@ starting point.
 |---|---|---|
 | `SQUELCH_OPEN_DB` / `SQUELCH_CLOSE_DB` | `8` / `5` | dB above the tracked noise floor |
 | `SQUELCH_HANG_S` | `3.0` | Silence allowed inside one transmission |
-| `PREROLL_S` / `MIN_TX_S` / `MAX_TX_S` | `1.0` / `4` / `600` | Audio kept before opening; shortest and longest transmission |
+| `PREROLL_S` / `MIN_TX_S` / `MAX_TX_S` | `1.0` / `4` / `300` | Audio kept before opening; shortest and longest transmission |
 | `ASR_BACKEND` | `whisper` | `none` skips transcription (useful for testing) |
 | `WHISPER_MODEL` | `small.en` | `tiny.en` … `medium.en` |
 | `WHISPER_DEVICE` / `WHISPER_COMPUTE` | `cpu` / `int8` | `cuda` if you have a GPU |

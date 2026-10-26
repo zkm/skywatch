@@ -50,7 +50,7 @@ class Config:
     hang_s: float = field(default_factory=lambda: float(_env("SQUELCH_HANG_S", "3.0")))
     preroll_s: float = field(default_factory=lambda: float(_env("PREROLL_S", "1.0")))
     min_tx_s: float = field(default_factory=lambda: float(_env("MIN_TX_S", "4.0")))
-    max_tx_s: float = field(default_factory=lambda: float(_env("MAX_TX_S", "600")))
+    max_tx_s: float = field(default_factory=lambda: float(_env("MAX_TX_S", "300")))
 
     # --- transcription ---
     asr_backend: str = field(default_factory=lambda: _env("ASR_BACKEND", "whisper"))
