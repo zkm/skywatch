@@ -19,7 +19,7 @@ DATA_DIR=./data EAM_SOURCE=file EAM_FILE=test.wav EAM_FILE_LOOP=1 ASR_BACKEND=no
   .venv/bin/uvicorn app.main:app --port 8000
 # add PUSH_SUBJECT=mailto:ops@example.com to enable browser push locally
 
-.venv/bin/python tools/build_pages.py _site                     # static GitHub Pages demo (needs numpy + ffmpeg)
+.venv/bin/python tools/build_pages.py _site                     # static demo, not published anymore (needs numpy + ffmpeg)
 ```
 
 There is no linter or formatter configured.
@@ -47,12 +47,14 @@ Worker threads hand events to async clients through `live.Fanout`/`EventBus`, wh
 
 **Frontend (`web/`)**: classic scripts sharing globals, loaded in order `app.js` → `trainer.js` → `aircraft.js` → `notify.js`. `app.js` defines the shared helpers (`$`, `api`, `getJSON`, `esc`, `state`) and a `hooks` object that later scripts chain onto (`hooks.view`, `hooks.aircraft`). Routing is hash-based (`#monitor`, `#trainer`, `#aircraft`) and runs on `DOMContentLoaded`, after every script has registered. All URLs are relative so the page works under `/skywatch/` on Pages. Colors are CSS custom properties with dark-mode overrides in two places (`prefers-color-scheme` and `[data-theme="dark"]`); keep them in sync. Leaflet loads lazily from cdnjs on the first visit to the aircraft tab. `sw.js` only handles push notifications and does no offline caching.
 
-**Demo mode**: `tools/build_pages.py` seeds a throwaway DB, dumps API responses as static JSON (`api/messages-<kind>.json`, `api/messages/<id>.json`, `api/aircraft.json`), and injects `window.SKYWATCH_DEMO = true` before `app.js` by string-replacing `<script src="app.js"></script>`, so keep that tag exactly as written in `index.html`. In demo mode the `api` helper switches to those files, and live audio, SSE, voting and push are disabled. New UI features need a `DEMO` branch.
+**Demo mode** (still supported, no longer published): `tools/build_pages.py` seeds a throwaway DB, dumps API responses as static JSON (`api/messages-<kind>.json`, `api/messages/<id>.json`, `api/aircraft.json`), and injects `window.SKYWATCH_DEMO = true` before `app.js` by string-replacing `<script src="app.js"></script>`, so keep that tag exactly as written in `index.html`. In demo mode the `api` helper switches to those files, and live audio, SSE, voting and push are disabled. New UI features need a `DEMO` branch.
+
+**Production**: https://skywatch.zkm.tw runs on the `skywatch` DigitalOcean droplet (nyc3, 2 GB; Whisper small.en needs ~1.1 GB). `/opt/skywatch` is a clone of `main`; `/opt/skywatch-deploy` holds `compose.yml` (Skywatch plus Caddy for HTTPS, Skywatch's port unpublished), `Caddyfile` and the secret `skywatch.env`. Data lives in `/var/lib/skywatch`, with a nightly snapshot at 03:30 UTC in `/var/backups/skywatch`. Deploy with `git -C /opt/skywatch pull && docker compose -f /opt/skywatch-deploy/compose.yml up -d --build`. DNS is a DNS-only (unproxied) Cloudflare A record. Audio currently comes from the missileer.watch KPH stream (`EAM_SOURCE=file`), because the KiwiSDR receivers hang up after kiwirecorder authenticates.
 
 ## Constraints
 
 - **CI installs only `numpy` and `pytest`** (no fastapi, faster-whisper or pywebpush). Tests must not import `app.main`, and modules they touch must keep heavy imports lazy (as `transcriber.py` and `push.py` do).
-- **CI (`.github/workflows/ci.yml`)**: the `test` job runs on pushes and PRs and is a required status check on the protected `main` branch. Build and deploy to GitHub Pages run only on `main` after tests pass.
+- **CI (`.github/workflows/ci.yml`)**: the `test` job runs on pushes and PRs and is a required status check on the protected `main` branch. It's the only job; the GitHub Pages demo was retired when the live site launched.
 - **Dependabot** opens monthly PRs for GitHub Actions and pip. pip uses `versioning-strategy: increase-if-necessary` because `requirements.txt` declares minimums (`>=`) on purpose; don't raise them without a reason.
 - **Static files**: UI assets are served with `Cache-Control: no-cache` (the `WebFiles` subclass in `main.py`). When checking UI changes in a browser, a stale cache is otherwise the usual cause of "my change didn't show up".
 - **`TRUST_PROXY`**: behind a reverse proxy it must be `1`, or every listener shares one voter id and one rate-limit bucket.
