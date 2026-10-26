@@ -104,6 +104,7 @@ starting point.
 | `WHISPER_MODEL` | `small.en` | `tiny.en` … `medium.en` |
 | `WHISPER_DEVICE` / `WHISPER_COMPUTE` | `cpu` / `int8` | `cuda` if you have a GPU |
 | `MIN_WORD_PROB` | `0.45` | Words Whisper is less sure of than this become `?` |
+| `WHISPER_VAD` | `0` | `1` turns on Whisper's own voice detection. It tends to throw away HF voice as noise, and the squelch already cuts out each transmission |
 | `KEEP_NON_EAM` | `1` | Also archive radio checks and other voice traffic |
 
 **Listeners**
