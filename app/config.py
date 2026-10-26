@@ -57,6 +57,9 @@ class Config:
     whisper_model: str = field(default_factory=lambda: _env("WHISPER_MODEL", "small.en"))
     whisper_device: str = field(default_factory=lambda: _env("WHISPER_DEVICE", "cpu"))
     whisper_compute: str = field(default_factory=lambda: _env("WHISPER_COMPUTE", "int8"))
+    # Silero VAD inside Whisper; off by default because it discards most HF voice as noise
+    # (the squelch already cuts each transmission out of the stream)
+    whisper_vad: bool = field(default_factory=lambda: _env("WHISPER_VAD", "0") == "1")
     min_word_prob: float = field(default_factory=lambda: float(_env("MIN_WORD_PROB", "0.45")))
     keep_non_eam: bool = field(default_factory=lambda: _env("KEEP_NON_EAM", "1") == "1")
 

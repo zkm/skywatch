@@ -38,6 +38,7 @@ class WhisperTranscriber:
         self.model = WhisperModel(cfg.whisper_model, device=cfg.whisper_device,
                                   compute_type=cfg.whisper_compute,
                                   download_root=str(cfg.data_dir / "models"))
+        self.vad = cfg.whisper_vad
 
     def transcribe(self, audio: np.ndarray) -> tuple[str, list[Word]]:
         segments, _info = self.model.transcribe(
@@ -48,8 +49,8 @@ class WhisperTranscriber:
             initial_prompt=PROMPT,
             hotwords=HOTWORDS,
             condition_on_previous_text=False,   # avoids runaway repetition on long EAMs
-            vad_filter=True,
-            vad_parameters={"min_silence_duration_ms": 1500},
+            vad_filter=self.vad,
+            vad_parameters={"min_silence_duration_ms": 1500} if self.vad else None,
         )
         words: list[Word] = []
         text_parts: list[str] = []
