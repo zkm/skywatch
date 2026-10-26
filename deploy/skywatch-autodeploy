@@ -1,0 +1,57 @@
+#!/bin/bash
+# Deploy origin/main to skywatch.zkm.tw when it changes and its CI "test" check passed.
+# After deploying, health-check the public site; on failure roll back and email the owner.
+# Run by skywatch-autodeploy.timer. Env overrides (for testing):
+#   HEALTH_URL (default https://skywatch.zkm.tw)  NOTIFY=0 (no failure email)
+set -u
+REPO=/opt/skywatch DEPLOY=/opt/skywatch-deploy
+HEALTH_URL=${HEALTH_URL:-https://skywatch.zkm.tw} NOTIFY=${NOTIFY:-1}
+log() { echo "$*"; }
+exec 9>/run/skywatch-autodeploy.lock
+flock -n 9 || { log "another deploy is running; skipping"; exit 0; }
+
+git -C "$REPO" fetch -q origin main || { log "git fetch failed"; exit 1; }
+old=$(git -C "$REPO" rev-parse HEAD) new=$(git -C "$REPO" rev-parse origin/main)
+[ "$old" = "$new" ] && exit 0
+
+# only deploy commits whose CI "test" check passed (public repo: no token needed)
+ci=$(curl -fsS --max-time 20 "https://api.github.com/repos/zkm/skywatch/commits/$new/check-runs?check_name=test" \
+  | python3 -c 'import json,sys; r=json.load(sys.stdin)["check_runs"]; print(r[0]["status"]+"/"+str(r[0]["conclusion"]) if r else "none")') \
+  || { log "couldn't read CI status for ${new:0:7}; will retry"; exit 0; }
+if [ "$ci" != "completed/success" ]; then log "${new:0:7}: CI test is $ci; not deploying yet"; exit 0; fi
+
+rebuild() { cd "$DEPLOY" && docker compose build --quiet skywatch 2>&1 | grep -v Bake; docker compose up -d skywatch 2>&1 | grep -v Bake | tail -1; }
+healthy() {
+  for _ in $(seq 24); do
+    sleep 5
+    curl -fs --max-time 10 -o /dev/null "$HEALTH_URL/" \
+      && curl -fs --max-time 10 "$HEALTH_URL/api/status" | python3 -c 'import json,sys; sys.exit(0 if json.load(sys.stdin).get("connected") else 1)' \
+      && return 0
+  done
+  return 1
+}
+notify() {
+  [ "$NOTIFY" = 1 ] || return 0
+  cd "$DEPLOY" && docker compose exec -T skywatch python -c '
+import sys
+from app.config import config as c
+from app.push import Mailer
+m = Mailer(c.smtp_host, c.smtp_port, c.smtp_user, c.smtp_password, c.smtp_from, c.alert_email_to)
+if m.enabled: m.send(sys.argv[1], sys.argv[2])' "$1" "$2" || log "failure email couldn't be sent"
+}
+
+log "deploying ${old:0:7} -> ${new:0:7} $(git -C "$REPO" log -1 --format=%s "$new")"
+if ! git -C "$REPO" merge -q --ff-only "$new"; then log "fast-forward failed; local clone has diverged"; exit 1; fi
+rebuild
+if healthy; then log "deployed ${new:0:7}; health check passed"; exit 0; fi
+
+log "health check FAILED for ${new:0:7}; rolling back to ${old:0:7}"
+if git -C "$REPO" reset -q --hard "$old"; then
+  rebuild
+  if healthy; then state="rolled back to ${old:0:7}, which is healthy"; else state="rolled back to ${old:0:7}, but it is ALSO unhealthy"; fi
+else
+  state="rollback to ${old:0:7} failed"
+fi
+log "$state"
+notify "Skywatch deploy of ${new:0:7} failed" "Deploying ${new:0:7} to skywatch.zkm.tw failed its health check ($HEALTH_URL). The server $state. See: journalctl -u skywatch-autodeploy"
+exit 1
