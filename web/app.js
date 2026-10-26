@@ -44,8 +44,9 @@ const myVotes = {
 const announce = (text) => { $("announce").textContent = ""; setTimeout(() => { $("announce").textContent = text; }, 50); };
 
 /* ---------- views ---------- */
-const VIEWS = ["monitor", "trainer", "aircraft"];
-const TITLES = { monitor: "Skywatch", trainer: "Copy trainer · Skywatch", aircraft: "Strategic aircraft · Skywatch" };
+const VIEWS = ["monitor", "trainer", "aircraft", "about"];
+const TITLES = { monitor: "Skywatch", trainer: "Copy trainer · Skywatch", aircraft: "Strategic aircraft · Skywatch",
+  about: "About · Skywatch" };
 const currentView = () => (VIEWS.includes(location.hash.slice(1)) ? location.hash.slice(1) : "monitor");
 function route() {
   const name = currentView();
@@ -61,6 +62,15 @@ window.addEventListener("hashchange", route);
 // the views live behind hash routes, so the skip link focuses the visible one instead of navigating
 $("skip").addEventListener("click", (e) => { e.preventDefault(); $(`view-${currentView()}`).focus(); });
 document.addEventListener("DOMContentLoaded", route);   // after trainer.js / aircraft.js have registered
+
+/* ---------- first-visit intro ---------- */
+const introSeen = () => { try { return localStorage.getItem("skywatch.intro") === "hidden"; } catch { return false; } };
+$("intro").hidden = introSeen();
+$("intro-hide").addEventListener("click", () => {
+  try { localStorage.setItem("skywatch.intro", "hidden"); } catch { /* storage unavailable */ }
+  $("intro").hidden = true;
+  $("view-monitor").focus();
+});
 
 /* ---------- live audio + status ---------- */
 const live = $("live");

@@ -136,6 +136,23 @@ main { max-width: 1120px; margin: 0 auto; padding: 0 clamp(16px, 4vw, 40px); }
 .btn.small { min-width: 36px; min-height: 36px; padding: 2px 10px; font: 600 15px/1.4 var(--copy); }
 .btn:disabled { opacity: .45; cursor: not-allowed; }
 
+/* --- first-visit intro and about page --- */
+.intro {
+  margin-top: 24px; padding: 16px 20px; max-width: 75ch;
+  background: var(--panel); border: 1px solid var(--edge); border-radius: 6px;
+}
+.intro h2 { margin: 0 0 6px; font-size: 18px; font-weight: 750; }
+.intro p { margin: 0 0 10px; }
+.intro-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; margin: 4px 0 0 !important; }
+.intro a, .about a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
+.about { max-width: 75ch; }
+.about h3 { margin: 28px 0 6px; font-size: 19px; font-weight: 700; }
+.about p { margin: 0 0 12px; }
+.guide { margin: 8px 0 0; display: grid; gap: 12px; }
+.guide dt { font-weight: 700; }
+.guide dd { margin: 2px 0 0; color: var(--ink-soft); }
+abbr[title] { text-decoration: underline dotted; cursor: help; }
+
 /* --- copy pad (the hero) --- */
 .pad { padding: 36px 0 28px; border-bottom: 1px solid var(--rule); }
 .pad-empty p { max-width: 52ch; color: var(--ink-soft); font-size: 18px; margin: 0; }

@@ -19,20 +19,20 @@
 <header class="bar">
   <div class="brand">
     <h1 class="mark">Skywatch</h1>
-    <p class="tag">HFGCS monitor</p>
+    <p class="tag">Listening to the US Air Force's worldwide HF radio network</p>
   </div>
   <div class="tuner">
     <button id="listen" class="listen">
       <span class="listen-icon" aria-hidden="true"></span><span id="listen-label">Listen live</span>
     </button>
     <div class="dial">
-      <span class="freq" id="freq">11175</span><span class="unit">kHz <span id="mode">USB</span></span>
+      <span class="freq" id="freq">11175</span><span class="unit">kHz <abbr id="mode" title="Upper sideband, the radio mode HFGCS voice uses">USB</abbr></span>
     </div>
-    <div class="meter" id="meter-box" role="img" aria-label="Signal meter" title="Signal above noise floor">
+    <div class="meter" id="meter-box" role="img" aria-label="Signal meter" title="Signal above the background noise. The yellow mark is where recording starts.">
       <div class="meter-fill" id="meter"></div>
       <div class="meter-thresh" id="thresh"></div>
     </div>
-    <span class="sql" id="sql" title="Squelch"><span class="sr-only">Squelch: </span><span id="sql-state">idle</span></span>
+    <span class="sql" id="sql" title="Says “copying” while a transmission is being recorded"><span class="sr-only">Squelch: </span><span id="sql-state">idle</span></span>
     <button id="notify" class="notify" aria-pressed="false" hidden>
       <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M12 3a6 6 0 0 0-6 6v4l-2 3h16l-2-3V9a6 6 0 0 0-6-6zm-2 15a2 2 0 0 0 4 0" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
       <span id="notify-label">Notify me</span>
@@ -44,9 +44,24 @@
   <a href="#monitor">Monitor</a>
   <a href="#trainer">Copy trainer</a>
   <a href="#aircraft">Aircraft</a>
+  <a href="#about">About</a>
 </nav>
 
 <main id="view-monitor" tabindex="-1">
+  <section class="intro" id="intro" aria-labelledby="intro-title" hidden>
+    <h2 id="intro-title">What you're looking at</h2>
+    <p>Skywatch listens around the clock to 11175&nbsp;kHz, the main frequency of the US Air Force's
+      High Frequency Global Communications System (HFGCS), a shortwave network that reaches military
+      aircraft anywhere in the world. Most of what you'll hear is static and routine radio checks.
+      Every so often a station reads out an <strong>Emergency Action Message</strong> (EAM): a string of
+      letters and digits in the phonetic alphabet, read twice.</p>
+    <p>Each box below is one character of that message as the computer heard it. A red
+      <span class="code"><span class="q">?</span></span> is one it couldn't make out: select it to hear that
+      moment and say what you heard. The messages are encrypted, so nobody here knows what they mean.
+      Skywatch only writes them down.</p>
+    <p class="intro-actions"><a href="#about">More about HFGCS and this page</a>
+      <button type="button" class="btn" id="intro-hide">Got it</button></p>
+  </section>
   <section class="pad" id="pad" aria-label="Selected message">
     <div class="pad-empty" id="pad-empty">
       <p>No messages copied yet. They'll appear here the moment one comes in, or pick one from the log.</p>
@@ -135,8 +150,55 @@
   </section>
 </main>
 
+<main id="view-about" tabindex="-1" hidden>
+  <section class="page about">
+    <h2>About Skywatch</h2>
+    <p class="lede">A plain-language guide to what this site listens to and how to read it.</p>
+
+    <h3>What is HFGCS?</h3>
+    <p>The High Frequency Global Communications System is the US Air Force's worldwide high-frequency
+      (shortwave) radio network, run from Grand Forks AFB and Joint Base Andrews. Ground stations use it to
+      reach aircraft wherever they are, including strategic bombers and airborne command posts. HF signals
+      bounce off the upper atmosphere, so they carry across oceans, but they also fade and crackle, which is
+      why the audio sounds rough. Its main frequency is 11175&nbsp;kHz, and anyone with a shortwave
+      receiver can listen.</p>
+
+    <h3>What is an Emergency Action Message?</h3>
+    <p>An EAM is a coded message to US strategic forces. A station calls all stations, reads a short header,
+      then the message itself: usually about 30 letters and digits in the phonetic alphabet
+      (“Alpha, Bravo, Seven…”). Then it says “I say again” and reads the whole thing a second time.
+      EAMs go out regularly. They're encrypted, so the characters mean nothing to outside listeners;
+      copying them accurately is the challenge, not decoding them.</p>
+
+    <h3>What is a Skyking?</h3>
+    <p>A shorter message that starts “Skyking, Skyking, do not answer”, followed by a codeword, a time and an
+      authentication. Skywatch shows those three parts.</p>
+
+    <h3>Reading the page</h3>
+    <dl class="guide">
+      <div><dt>Listen live</dt><dd>Plays 11175&nbsp;kHz as it is right now. Expect mostly static, with voices coming and going.</dd></div>
+      <div><dt>Meter and lamp</dt><dd>The bar shows how far the signal is above the background noise. When it passes the yellow mark, Skywatch starts recording and the lamp says “copying”.</dd></div>
+      <div><dt>The copy</dt><dd>The header, then the message one character per box, then each of the two readings underneath. Where one reading was unclear, the other fills the gap.</dd></div>
+      <div><dt>Red <span class="code"><span class="q">?</span></span></dt><dd>A character the computer couldn't make out, or one where the two readings disagree.</dd></div>
+      <div><dt>Blue, underlined</dt><dd>A character listeners have corrected. Select any box to hear that moment and vote; once enough people agree, their answer is used.</dd></div>
+      <div><dt>Copy trainer</dt><dd>Practise copying a real recording yourself and see how you did.</dd></div>
+      <div><dt>Aircraft</dt><dd>E-6B Mercury, E-4B Nightwatch, B-52H, B-2 and WC-135 positions from public ADS-B receivers. These aircraft often fly without broadcasting a position, so an empty map is normal.</dd></div>
+    </dl>
+
+    <h3>Where it comes from</h3>
+    <p>The audio is public HF radio picked up by online receivers, transcribed by
+      <a href="https://github.com/SYSTRAN/faster-whisper">Whisper</a> speech recognition, which makes
+      mistakes on noisy radio, hence the corrections. Aircraft positions come from
+      <a href="https://adsb.lol">adsb.lol</a>. Background reading:
+      <a href="https://priyom.org/military-stations/united-states/hfgcs">Priyom</a>,
+      <a href="https://www.numbers-stations.com/usa/hfgcs/">Number Stations Research</a> and
+      <a href="https://neetintel.github.io/hfgcs_faq.html">NEET INTEL's HFGCS FAQ</a>.
+      Skywatch is open source on <a href="https://github.com/zkm/skywatch">GitHub</a>.</p>
+  </section>
+</main>
+
 <footer class="foot">
-  <p>Audio is public HF from KiwiSDR receivers; aircraft positions are public ADS-B via adsb.lol. The messages are encrypted; this copies characters, it doesn't decode them.</p>
+  <p>Audio is public HF radio from online receivers; aircraft positions are public ADS-B via adsb.lol. The messages are encrypted; this copies characters, it doesn't decode them.</p>
 </footer>
 <div class="toast" id="toast" role="status" hidden></div>
 <div class="sr-only" id="announce" aria-live="polite"></div>
