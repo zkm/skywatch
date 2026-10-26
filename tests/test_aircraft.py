@@ -44,3 +44,13 @@ def test_on_appear_fires_once_per_sighting():
     w.update({"ac": []}, now=1030 + FORGET_AFTER_S + 10)      # forgotten...
     w.update({"ac": [FEED["ac"][1]]}, now=1030 + FORGET_AFTER_S + 40)
     assert [a["hex"] for a in seen] == ["adfdf9"]              # ...so it alerts again
+
+
+def test_747_200_is_e4b_only_by_tail():
+    feed = {"ac": [
+        {"hex": "adfeb5", "t": "B742", "r": "74-0787"},     # E-4B
+        {"hex": "adfdf8", "t": "B742", "r": "82-8000"},     # VC-25A, not an E-4B
+        {"hex": "adfeb6", "t": "B742"},                     # no tail: can't tell, assume E-4B
+    ]}
+    got = {a["hex"]: a["label"] for a in pick(feed, now=0)}
+    assert got == {"adfeb5": "E-4B Nightwatch", "adfeb6": "E-4B Nightwatch"}
