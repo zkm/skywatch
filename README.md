@@ -1,85 +1,57 @@
 # Skywatch
 
-**Listen to the US Air Force's HFGCS shortwave network, and copy every Emergency Action Message as it's broadcast.**
-
-Skywatch tunes public KiwiSDR receivers to 11175 kHz, cuts out each
-transmission, transcribes it with Whisper, and copies Emergency Action Messages
-(EAMs) character by character. Listeners can hear any message again, fix the
-characters the machine missed, practise copying for themselves, follow
-strategic aircraft on public ADS-B, and get a notification when a new EAM
-comes in.
+**Listen to the US Air Force's HF radio network and copy every Emergency Action Message as it's read.**
 
 **[Listen live →](https://skywatch.zkm.tw)**
 
 ![Skywatch copy pad: a 30-character EAM with two positions corrected by listeners and the correction editor open](docs/screenshot.png)
 
-> EAMs are encrypted. Skywatch copies the characters as they're read on air; it
-> doesn't, and can't, decode them. Everything it uses is public: open shortwave
-> broadcasts and public ADS-B receivers.
+> EAMs are encrypted. Skywatch writes down the characters; it can't decode them.
+> Everything it uses is public: shortwave radio and ADS-B.
 
 ## Features
 
-- **Live audio.** A 32 kbps MP3 stream of 11175 kHz USB, with a signal meter and
-  a squelch light that shows when traffic is being copied.
-- **Machine copy.** Each EAM is transcribed and parsed into its header and
-  roughly 30-character body. The two on-air reads (the message, then "I say
-  again") are merged, so a character missed once can be recovered from the repeat.
-- **Crowd corrections.** Click any character to hear it and vote on what it really
-  was. Once enough listeners agree, their character replaces the machine's `?`.
-- **Copy trainer.** Copy a real recording into a grid and see how you did. Any
-  characters nobody has copied yet can be sent in as corrections.
-- **Strategic aircraft.** E-6B Mercury, E-4B Nightwatch, B-52H, B-2 and WC-135 on
-  a map whenever public ADS-B receivers hear them.
-- **Notifications.** Browser push (or an [ntfy](https://ntfy.sh) topic) for every
-  new EAM, even with the tab closed, and an optional email when an E-4B
-  Nightwatch shows up on ADS-B.
-- **Archive.** EAMs, Skykings and other voice traffic with their recordings,
-  per-character timestamps and full transcripts.
+- **Live audio** from 11175 kHz, with a signal meter.
+- **Machine copy** of each EAM, character by character, from both on-air reads.
+- **Crowd corrections:** click a character to hear it and vote. Agreed votes replace the `?`.
+- **Copy trainer:** practise on real recordings.
+- **Strategic aircraft** (E-6B, E-4B, B-52H, B-2, WC-135) on a map from public ADS-B.
+- **Alerts:** browser push or [ntfy](https://ntfy.sh) for new EAMs, email when an E-4B appears.
 
 ## How it works
 
-```
-KiwiSDR ─kiwirecorder─▶ ffmpeg (16 kHz) ─┬─▶ MP3 encoder ─────────────▶ /live.mp3
-                                         └─▶ squelch ─▶ Whisper ─▶ EAM parser ─▶ SQLite + MP3
-                                                                        ├─▶ /api/events (SSE) ─▶ browsers
-                                                                        └─▶ Web Push / ntfy
-adsb.lol ──────── every 30 s ───────────▶ aircraft filter ─────────────▶ /api/aircraft + SSE
+```mermaid
+flowchart LR
+  K[KiwiSDR receivers] --> F[ffmpeg]
+  F --> L[Live MP3 stream]
+  F --> S[Squelch] --> W[Whisper] --> P[EAM parser] --> DB[(SQLite + recordings)]
+  P --> B[Browsers]
+  P --> N[Push / ntfy]
+  A[adsb.lol] --> AF[Aircraft filter] --> B
 ```
 
-An energy squelch tracks the noise floor and opens when the signal rises above
-it. Each transmission it captures goes to Whisper. The parser in
-`app/phonetic.py` turns NATO words and spoken digits into characters, finds the
-header, the body and the repeat from the spoken markers, and merges the two
-reads. Anything it isn't sure of becomes `?`, with its best guesses kept for the UI.
+The squelch cuts out each transmission. Whisper transcribes it, and the parser
+turns the phonetic words into characters. Anything uncertain becomes `?`.
 
 ## Quick start
 
-You need one or more public KiwiSDR receivers with decent 11 MHz reception
-toward the HFGCS stations. Pick some from the [KiwiSDR map](http://kiwisdr.com/public/)
-that have free slots and no time limit, and their own address (`host:port`, often
-port 8073). Receivers listed as `*.proxy.kiwisdr.com` don't work: the proxy accepts
-kiwirecorder's connection, then closes it about 10 seconds later.
-
-**With Docker:**
+Pick a few receivers from the [KiwiSDR map](http://kiwisdr.com/public/) with free
+slots, no time limit and their own `host:port`. Skip `*.proxy.kiwisdr.com`
+receivers; they drop the connection.
 
 ```sh
-cp .env.example .env        # set KIWI_HOSTS=host:port[,host:port...]
-docker compose up --build   # then open http://localhost:8000
+cp .env.example .env        # set KIWI_HOSTS=host:port,host:port
+docker compose up --build   # open http://localhost:8000
 ```
 
-**Without Docker** (needs Python 3.11 to 3.14 and ffmpeg on your `PATH`; faster-whisper's
-dependencies don't install on 3.15 yet):
+Without Docker you need Python 3.11–3.14, ffmpeg and
+[kiwiclient](https://github.com/jks-prv/kiwiclient):
 
 ```sh
-git clone --depth 1 https://github.com/jks-prv/kiwiclient.git /opt/kiwiclient
-python -m venv .venv && . .venv/bin/activate
-pip install -r requirements.txt
-export $(grep -v '^#' .env | xargs) KIWIRECORDER=/opt/kiwiclient/kiwirecorder.py
+python -m venv .venv && . .venv/bin/activate && pip install -r requirements.txt
+export $(grep -v '^#' .env | xargs) KIWIRECORDER=/path/to/kiwiclient/kiwirecorder.py
 uvicorn app.main:app --port 8000
 ```
-
-The first start downloads the Whisper model into `DATA_DIR/models`, which needs
-access to huggingface.co.
 
 ## Configuration
 
@@ -134,126 +106,29 @@ starting point.
 | `TRUST_PROXY` | `0` | Set to `1` behind a reverse proxy so listeners are told apart by `X-Forwarded-For` |
 | `LOG_LEVEL` | `INFO` | |
 
-## Using it
-
-### Crowd corrections
-
-Select a character in an EAM to hear that moment of the recording and open the
-editor. It shows what the machine heard and how listeners have voted. Type what
-you heard or pick a suggestion. The arrow keys move between characters, and
-typing a letter on one starts a vote.
-
-A position switches to the crowd's character (shown in blue) once
-`CORRECTION_MIN_VOTES` listeners agree and no other character ties it. The
-machine's copy is always kept alongside. Each listener gets one vote per
-position, and voting again replaces it. Listeners are identified by a salted
-hash of their IP address, never the address itself.
-
-### Copy trainer
-
-The trainer plays a random archived EAM while you copy it into a grid. Playback
-can be slowed to 0.75×, and the message is read twice. **Check my copy** marks
-each character against the reference (the machine's copy plus crowd
-corrections) and gives a score over the characters anyone knows. If you filled
-in a position nobody has copied yet, you can send it in as a correction. The
-trainer runs entirely in the browser, so it also works in the static demo build.
-
-### Strategic aircraft
-
-Every 30 seconds Skywatch reads adsb.lol's military feed. It keeps the E-6B,
-E-4B, B-52H, B-2 and WC-135/OC-135 by ICAO type, plus the four E-4B airframes by
-tail number (`app/aircraft.py`). Each aircraft gets an hour-long trail and drops
-off 15 minutes after it was last heard. These aircraft often fly without
-broadcasting their position, so an empty map is the usual state.
-
-### Notifications
-
-Set `PUSH_SUBJECT` and a **Notify me** button appears in the header. Clicking it
-subscribes the browser to Web Push. A confirmation arrives right away, then one
-notification per new EAM showing the copy, its length, the callsign and the
-time.
-
-- **iPhone and iPad** only allow web push for sites added to the Home Screen.
-  The button explains this when tapped in Safari.
-- **HTTPS** is required for push anywhere except localhost.
-- **ntfy:** set `NTFY_URL` to send the same alerts to an ntfy topic, for people
-  who'd rather use that app.
-- **E-4B email:** set `ALERT_EMAIL_TO` and the `SMTP_*` variables to get an
-  email when an E-4B Nightwatch shows up on ADS-B. Each aircraft alerts at most
-  once every 6 hours, across restarts too, so a plane that's flying while you
-  restart Skywatch doesn't send it again.
-
 ## Deploying
 
-- **Put it behind HTTPS.** Browser push needs it. With a reverse proxy (Caddy,
-  nginx), set `TRUST_PROXY=1`; otherwise every listener appears to come from
-  the proxy and corrections hit the rate limit almost at once. Disable response
-  buffering for `/live.mp3` and `/api/events` (the app sends
-  `X-Accel-Buffering: no` for nginx).
-- **Back up `DATA_DIR`.** It holds the archive (`skywatch.sqlite3`, `audio/`)
-  and two keys you can't regenerate without consequences:
-  `vapid_private.pem` (replacing it breaks every push subscription) and
-  `voter.salt` (replacing it lets everyone vote again).
-- **Use several receivers.** Public Kiwis drop users for time limits and full
-  slots. List several in `KIWI_HOSTS` and Skywatch rotates through them.
-- **Size the server for Whisper.** `small.en` needs about 1.1 GB of RAM, so 2 GB
-  is the minimum. With Whisper's voice detection off (the default), every
-  transmission is transcribed in full, which can take longer than the audio
-  itself on a single cloud vCPU; use at least 2.
-- **Example setup.** https://skywatch.zkm.tw runs on a 2 vCPU / 2 GB
-  DigitalOcean droplet. [`deploy/`](deploy/) has its Docker Compose file, Caddy
-  config, auto-deploy and nightly backup scripts, and notes for rebuilding it.
+- **HTTPS** is required for browser push. Behind a reverse proxy, set `TRUST_PROXY=1`.
+- **Back up `DATA_DIR`.** `vapid_private.pem` and `voter.salt` can't be replaced
+  without breaking push subscriptions and voting.
+- **List several receivers** in `KIWI_HOSTS`; Skywatch moves to the next if one drops.
+- **Size:** at least 2 GB RAM and 2 vCPUs for Whisper `small.en`.
+- **Example:** [`deploy/`](deploy/) has the setup behind skywatch.zkm.tw
+  (Docker Compose, Caddy, auto-deploy, backups).
 
 ## Development
 
-Run everything offline with a synthetic recording and fake data:
-
 ```sh
-python tools/make_test_audio.py test.wav                 # noise + two voice-like bursts
-DATA_DIR=./data PYTHONPATH=. python tools/seed_demo.py    # a fake EAM + Skyking from "Demo", with votes
+python tools/make_test_audio.py test.wav                 # synthetic test audio
+DATA_DIR=./data PYTHONPATH=. python tools/seed_demo.py    # sample messages
 EAM_SOURCE=file EAM_FILE=test.wav ASR_BACKEND=none uvicorn app.main:app
 python -m pytest -q
 ```
 
-`EAM_SOURCE=file` also takes a real recording, which is the easiest way to tune
-the squelch and choose a Whisper model size.
+`EAM_SOURCE=file` also plays real recordings, the easiest way to tune the squelch.
+`python tools/build_pages.py _site` builds a static demo with sample data.
 
-**Static demo.** `python tools/build_pages.py _site` builds a static copy of the
-UI with the sample data and an ADS-B snapshot, for hosting anywhere without a
-server (no live audio, voting or push). It's no longer published automatically;
-the live site at https://skywatch.zkm.tw replaced it.
-
-**Layout**
-
-```
-app/
-  main.py         FastAPI routes, SSE, static files
-  pipeline.py     source → squelch → ASR → parser → store, events, notifications
-  source.py       KiwiSDR and file audio sources
-  segmenter.py    energy squelch
-  transcriber.py  Whisper (faster-whisper)
-  phonetic.py     NATO/digit parsing, EAM and Skyking structure, two-read merge
-  corrections.py  vote consensus, voter ids, rate limiting
-  aircraft.py     ADS-B polling and filtering
-  push.py         Web Push and ntfy
-  store.py        SQLite
-web/              UI (no build step): app.js, trainer.js, aircraft.js, notify.js, sw.js
-tools/            test audio, demo seeding, static demo build
-tests/            pytest suite
-deploy/           production server files (compose, Caddy, auto-deploy, backups)
-docs/             screenshot and the link-preview card source
-```
-
-### Tuning
-
-- **Squelch:** the meter in the header marks the opening threshold. If static or
-  interference opens the squelch, raise `SQUELCH_OPEN_DB`.
-- **Split EAMs:** `SQUELCH_HANG_S` must be longer than the pauses between
-  character groups, or one EAM gets cut into several transmissions.
-- **Whisper model:** `small.en` takes roughly as long as the audio on one fast
-  CPU core, and longer on a cloud vCPU; transmissions queue during busy periods.
-  `medium.en`, or `WHISPER_DEVICE=cuda`, copies noticeably better on weak signals
-  but needs more CPU (or a GPU).
+Code: `app/` (server), `web/` (UI, no build step), `tests/`, `tools/`, `deploy/`.
 
 ## API
 
@@ -277,27 +152,19 @@ docs/             screenshot and the link-preview card source
 
 ## Credits
 
-- Message format and HFGCS background from [Priyom](https://priyom.org).
-- Receivers: the [KiwiSDR](http://kiwisdr.com) network and
-  [kiwiclient](https://github.com/jks-prv/kiwiclient).
-- Aircraft positions: [adsb.lol](https://adsb.lol). Map: [Leaflet](https://leafletjs.com)
-  and [OpenStreetMap](https://www.openstreetmap.org/copyright) contributors.
-- Transcription: [faster-whisper](https://github.com/SYSTRAN/faster-whisper).
-- Inspired by [missileer.watch](https://missileer.watch).
+- Receivers: [KiwiSDR](http://kiwisdr.com) and [kiwiclient](https://github.com/jks-prv/kiwiclient)
+- Transcription: [faster-whisper](https://github.com/SYSTRAN/faster-whisper)
+- Aircraft: [adsb.lol](https://adsb.lol), [Leaflet](https://leafletjs.com),
+  [OpenStreetMap](https://www.openstreetmap.org/copyright)
+- Inspired by [missileer.watch](https://missileer.watch)
 
-**Background reading** on HFGCS, EAMs and Skykings:
-
-- Ashton B. Carter, "The Command and Control of Nuclear War," *Scientific American* 252,
-  no. 1 (January 1985): 32–39.
-- U.S. Air Force, Grand Forks AFB, ["319th CS hosts High Frequency Global Communications
-  System open house"](https://www.grandforks.af.mil/News/Display/Article/3415740/) (2 June 2023):
-  HFGCS is an Air Force system operated from Grand Forks AFB and Joint Base Andrews.
-- Number Stations Research, ["The HF-GCS and Emergency Action Messages"](https://www.numbers-stations.com/usa/hfgcs/):
-  the network, its sites and frequencies, and the Skyking format.
-- Listener references: [Priyom](https://priyom.org/military-stations/united-states/hfgcs),
-  [NEET INTEL's HFGCS FAQ](https://neetintel.github.io/hfgcs_faq.html) and Milcom Monitoring
-  Post's ["What are Emergency Action Messages?"](https://mt-milcom.blogspot.com/p/what-is-emergency-action-message-or-eam.html)
+**Background reading:** [Priyom](https://priyom.org/military-stations/united-states/hfgcs) ·
+[Number Stations Research](https://www.numbers-stations.com/usa/hfgcs/) ·
+[NEET INTEL FAQ](https://neetintel.github.io/hfgcs_faq.html) ·
+[Milcom Monitoring Post](https://mt-milcom.blogspot.com/p/what-is-emergency-action-message-or-eam.html) ·
+[USAF Grand Forks](https://www.grandforks.af.mil/News/Display/Article/3415740/) ·
+Ashton B. Carter, "The Command and Control of Nuclear War," *Scientific American*, January 1985
 
 ## License
 
-[MIT](LICENSE). To report a security problem, see [SECURITY.md](SECURITY.md).
+[MIT](LICENSE). Security issues: [SECURITY.md](SECURITY.md).
