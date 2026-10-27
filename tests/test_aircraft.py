@@ -120,3 +120,32 @@ def test_retry_after_and_all_feeds_down():
     assert w.calls[2:] == ["http://b"]
     snap = w.poll(now=1050)                       # both resting: no requests at all
     assert w.calls[3:] == [] and snap["error"] == "every feed is backing off"
+
+
+def test_approx_position_when_not_broadcasting():
+    feed = {"ac": [
+        # RC-135S as adsb.fi sent it: no lat/lon, a 19-minute-old lastPosition, and a rough one
+        {"hex": "ae01d7", "t": "R135", "r": "62-4128", "alt_baro": 36000, "seen": 0.2,
+         "rr_lat": 34.3, "rr_lon": 135.6,
+         "lastPosition": {"lat": 33.92817, "lon": 139.081588, "seen_pos": 1161.39}},
+        {"hex": "ae6bec", "t": "B1", "r": "86-0103", "rr_lat": 44.7, "rr_lon": -102.4, "seen": 5},
+        {"hex": "ae0010", "t": "B1", "r": "86-0099", "rr_lat": 40.0, "rr_lon": -100.0,   # too old
+         "lastPosition": {"lat": 41.0, "lon": -99.0, "seen_pos": 7200}},
+        {"hex": "ae0011", "t": "B52", "r": "60-0001", "lat": 48.4, "lon": -101.3,          # live
+         "rr_lat": 48.0, "rr_lon": -101.0},
+        {"hex": "ae0012", "t": "B52", "r": "60-0002"},                                     # nothing
+    ]}
+    got = {a["hex"]: a for a in pick(feed, now=10000)}
+    assert got["ae01d7"]["lat"] is None
+    assert got["ae01d7"]["approx"] == {"kind": "last", "lat": 33.92817, "lon": 139.081588,
+                                       "at": 10000 - 1161.39}
+    assert got["ae6bec"]["approx"] == {"kind": "rough", "lat": 44.7, "lon": -102.4, "at": None}
+    assert got["ae0010"]["approx"]["kind"] == "rough"
+    assert got["ae0011"]["approx"] is None
+    assert got["ae0012"]["approx"] is None
+
+
+def test_approx_positions_dont_make_trails():
+    w = AircraftWatch("http://example.invalid", 30, lambda s: None)
+    snap = w.update({"ac": [{"hex": "ae6bec", "t": "B1", "rr_lat": 44.7, "rr_lon": -102.4}]}, now=0)
+    assert snap["aircraft"][0]["trail"] == []

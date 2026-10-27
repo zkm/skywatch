@@ -30,6 +30,20 @@ function ago(epoch) {
   return `${Math.round(s / 86400)} d ago`;
 }
 
+// where to draw an aircraft: its live position, else the feed's last-known or rough one
+const ROUGH_RADIUS_M = 250000;    // rough = a receiver that hears it, so a few hundred km
+function where(a) {
+  if (a.lat != null && a.lon != null) return { kind: "live", lat: a.lat, lon: a.lon };
+  return a.approx || null;
+}
+function posNote(a) {
+  const w = where(a);
+  if (!w) return "no position · ";
+  if (w.kind === "last") return `position ${ago(w.at).replace(" ago", " old")} · `;
+  if (w.kind === "rough") return "rough area · ";
+  return "";
+}
+
 function airMeta(snap) {
   if (DEMO) return snap.updated_at ? `Snapshot taken ${zTime(snap.updated_at)}, when this demo was built.` : "No snapshot in this build.";
   if (snap.error && !snap.updated_at) return `ADS-B feed unavailable: ${snap.error}`;
@@ -44,11 +58,11 @@ function renderAirTable(snap) {
   const list = [...snap.aircraft].sort((a, b) => b.seen_at - a.seen_at);
   $("air-rows").innerHTML = list.length
     ? list.map((a) => `<tr data-hex="${esc(a.hex)}">
-        <td>${a.lat == null ? esc(a.label)    // nothing to show on the map
+        <td>${!where(a) ? esc(a.label)    // nothing to show on the map
           : `<button type="button" class="rowbtn" aria-label="${esc(a.label)}, show on map">${esc(a.label)}</button>`}</td>
         <td class="code" data-label="Callsign">${esc(a.callsign || "—")}</td><td data-label="Tail">${esc(a.reg || "—")}</td>
         <td class="num" data-label="Altitude">${altText(a)}</td><td class="num" data-label="Speed">${a.gs != null ? `${Math.round(a.gs)} kt` : "—"}</td>
-        <td class="num" data-label="Heard">${a.lat == null ? "no position · " : ""}${ago(a.seen_at)}</td></tr>`).join("")
+        <td class="num" data-label="Heard">${posNote(a)}${ago(a.seen_at)}</td></tr>`).join("")
     : `<tr class="empty-row"><td colspan="6">${DEMO
       ? "None of the watched aircraft were being heard when this snapshot was taken. A running Skywatch server updates this every 30 seconds."
       : "None of the watched aircraft are being heard right now. They often fly without broadcasting, so check back later."}</td></tr>`;
@@ -56,37 +70,47 @@ function renderAirTable(snap) {
 
 function renderMap(snap) {
   if (!air.map) return;
-  const ink = cssVar("--ink"), signal = cssVar("--signal");
+  const ink = cssVar("--ink"), signal = cssVar("--signal"), soft = cssVar("--ink-soft");
   const seen = new Set();
   for (const a of snap.aircraft) {
-    if (a.lat == null || a.lon == null) continue;
+    const w = where(a);
+    if (!w) continue;
     seen.add(a.hex);
-    const icon = L.divIcon({
-      className: "ac",
-      iconSize: [28, 28], iconAnchor: [14, 14],
-      html: `<svg viewBox="0 0 24 24" width="28" height="28" style="transform:rotate(${a.track || 0}deg)" aria-hidden="true">
-        <path d="M12 2 L14 10 L22 14 L22 16 L14 14 L13.5 19 L16 21 L16 22 L12 21 L8 22 L8 21 L10.5 19 L10 14 L2 16 L2 14 L10 10 Z" fill="${ink}" stroke="${signal}" stroke-width="1"/></svg>`,
-    });
     let l = air.layers.get(a.hex);
+    if (l && l.kind !== w.kind) { l.mark.remove(); l.trail.remove(); l = null; }   // e.g. stopped broadcasting
     if (!l) {
-      l = {
-        marker: L.marker([a.lat, a.lon], { icon, keyboard: false }).addTo(air.map),
-        trail: L.polyline([], { color: signal, weight: 2, opacity: 0.8 }).addTo(air.map),
-      };
+      const mark = w.kind === "rough"
+        ? L.circle([w.lat, w.lon], { radius: ROUGH_RADIUS_M, color: soft, weight: 1.5, dashArray: "4 4", fillOpacity: 0.08 })
+        : L.marker([w.lat, w.lon], { keyboard: false });
+      l = { kind: w.kind, mark: mark.addTo(air.map),
+            trail: L.polyline([], { color: signal, weight: 2, opacity: 0.8 }).addTo(air.map) };
       air.layers.set(a.hex, l);
     }
-    l.marker.setLatLng([a.lat, a.lon]).setIcon(icon);
-    l.marker.unbindTooltip().bindTooltip(esc(short(a.label)), { permanent: true, direction: "right", offset: [12, 0], className: "ac-tip" });
-    l.marker.bindPopup(`<strong>${esc(a.label)}</strong><br>${esc(a.callsign || "no callsign")} · ${esc(a.reg || "tail unknown")}<br>
-      ${altText(a)}${a.gs != null ? ` · ${Math.round(a.gs)} kt` : ""}${a.squawk ? ` · squawk ${esc(a.squawk)}` : ""}<br>Heard ${ago(a.seen_at)}`);
+    l.mark.setLatLng([w.lat, w.lon]);
+    if (w.kind !== "rough") {
+      l.mark.setIcon(L.divIcon({
+        className: w.kind === "last" ? "ac ac-stale" : "ac",
+        iconSize: [28, 28], iconAnchor: [14, 14],
+        html: `<svg viewBox="0 0 24 24" width="28" height="28" style="transform:rotate(${a.track || 0}deg)" aria-hidden="true">
+          <path d="M12 2 L14 10 L22 14 L22 16 L14 14 L13.5 19 L16 21 L16 22 L12 21 L8 22 L8 21 L10.5 19 L10 14 L2 16 L2 14 L10 10 Z" fill="${ink}" stroke="${signal}" stroke-width="1"/></svg>`,
+      }));
+    }
+    const tip = w.kind === "last" ? ` · ${ago(w.at)}` : w.kind === "rough" ? " · rough area" : "";
+    l.mark.unbindTooltip().bindTooltip(esc(short(a.label) + tip), w.kind === "rough"
+      ? { permanent: true, direction: "center", className: "ac-tip" }
+      : { permanent: true, direction: "right", offset: [12, 0], className: "ac-tip" });
+    const note = w.kind === "last" ? `<br><em>Not broadcasting a position now. Shown where it last did, ${ago(w.at)}.</em>`
+      : w.kind === "rough" ? "<br><em>Not broadcasting a position. The circle is a rough area around a receiver that hears it.</em>" : "";
+    l.mark.bindPopup(`<strong>${esc(a.label)}</strong><br>${esc(a.callsign || "no callsign")} · ${esc(a.reg || "tail unknown")}<br>
+      ${altText(a)}${a.gs != null ? ` · ${Math.round(a.gs)} kt` : ""}${a.squawk ? ` · squawk ${esc(a.squawk)}` : ""}<br>Heard ${ago(a.seen_at)}${note}`);
     l.trail.setLatLngs(a.trail || []);
   }
   for (const [hex, l] of air.layers) {
     if (seen.has(hex)) continue;
-    l.marker.remove(); l.trail.remove(); air.layers.delete(hex);
+    l.mark.remove(); l.trail.remove(); air.layers.delete(hex);
   }
   if (!air.fitted && air.layers.size) {
-    air.map.fitBounds(L.latLngBounds([...air.layers.values()].map((l) => l.marker.getLatLng())).pad(0.5), { maxZoom: 6 });
+    air.map.fitBounds(L.latLngBounds([...air.layers.values()].map((l) => l.mark.getLatLng())).pad(0.5), { maxZoom: 6 });
     air.fitted = true;
   }
 }
@@ -124,7 +148,7 @@ async function airOpen() {
 $("air-rows").addEventListener("click", (e) => {
   const tr = e.target.closest("tr[data-hex]");
   const l = tr && air.layers.get(tr.dataset.hex);
-  if (l && air.map) { air.map.setView(l.marker.getLatLng(), Math.max(air.map.getZoom(), 6)); l.marker.openPopup(); }
+  if (l && air.map) { air.map.setView(l.mark.getLatLng(), Math.max(air.map.getZoom(), l.kind === "rough" ? 5 : 6)); l.mark.openPopup(); }
 });
 
 hooks.aircraft = (snap) => renderAir(snap);

@@ -239,6 +239,7 @@ a[target="_blank"]::after { content: "\2197" / ""; margin-left: 2px; font-size: 
 .map.leaflet-container { display: block; font: inherit; }
 .map .leaflet-tile-pane { filter: var(--tile-filter); }
 .ac { background: none; border: 0; }
+.ac-stale { opacity: 0.5; }   /* last-known position, not live */
 .ac-tip { font: 600 12px/1 var(--ui); padding: 2px 5px; }
 .air-rows tbody tr[data-hex] { cursor: pointer; }
 
