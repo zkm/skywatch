@@ -130,10 +130,10 @@ def tokenize(words: list[Word], min_prob: float) -> list[Tok]:
     return toks
 
 
-_MARKER_WORDS = {"message", "follows", "say", "again", "stand", "standby", "by", "this",
+_MARKER_WORDS = {"message", "say", "again", "stand", "standby", "by", "this",
                  "is", "out", "time", "authentication", "characters", "of", "all",
                  "stations", "skyking", "sky", "king", "do", "not", "answer", "more",
-                 "to", "follow", "for", "i"}
+                 "to", "follow", "follows", "followed", "following", "for", "i"}
 
 
 def _is_marker_word(w: str) -> bool:
@@ -172,6 +172,8 @@ SAY_AGAIN = [["i", "say", "again"], ["say", "again"]]
 STAND_BY = [["stand", "by"], ["standby"]]
 THIS_IS = [["this", "is"]]
 END_MARKERS = [["this", "is"], ["out"], ["more", "to", "follow"]]
+# Whisper often hears "follows" as "followed" or "following"
+FOLLOWS = [["follows"], ["followed"], ["following"], ["follow"]]
 
 
 def _parse_cardinal(words: list[str]) -> Optional[int]:
@@ -281,7 +283,7 @@ def parse(words: list[Word], min_prob: float = 0.45) -> Parsed:
     body_start = -1
     m = _find(seq, ["message"])
     while m >= 0:
-        f = _find(seq, ["follows"], m)
+        f = _find_any(seq, FOLLOWS, m)[0]
         if 0 <= f - m <= 5:
             body_start = f + 1
             if f - m > 1:

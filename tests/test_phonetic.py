@@ -61,6 +61,14 @@ def test_announced_length():
     assert p.body == body
 
 
+def test_misheard_follows():
+    # production: "Message of 48 characters Followed" lost the start of the body
+    body = BODY[:28]
+    p = parse(words(eam_text(body, body, "Message of twenty eight characters followed.")))
+    assert p.expected_len == 28
+    assert p.body == body
+
+
 def test_numerals_from_asr_are_split():
     ws = words("Message follows. Alpha 25 Bravo Charlie Delta Echo Foxtrot Golf Hotel "
                "India Juliet Kilo Lima Mike November Oscar Papa Quebec Romeo Sierra "
