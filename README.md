@@ -15,7 +15,7 @@
 - **Machine copy** of each EAM, character by character, from both on-air reads.
 - **Crowd corrections:** click a character to hear it and vote. Agreed votes replace the `?`.
 - **Copy trainer:** practise on real recordings.
-- **Strategic aircraft** (E-6B, E-4B, B-52H, B-2, WC-135) on a map from public ADS-B.
+- **Strategic aircraft** (E-6B, E-4B, B-52H, B-2, B-1B, RC-135, WC-135, VC-25A) on a map from public ADS-B.
 - **Alerts:** browser push or [ntfy](https://ntfy.sh) for new EAMs, email when an E-4B appears.
 
 ## How it works

@@ -51,6 +51,15 @@ def test_747_200_is_e4b_only_by_tail():
         {"hex": "adfeb5", "t": "B742", "r": "74-0787"},     # E-4B
         {"hex": "adfdf8", "t": "B742", "r": "82-8000"},     # VC-25A, not an E-4B
         {"hex": "adfeb6", "t": "B742"},                     # no tail: can't tell, assume E-4B
+        {"hex": "adfeb7", "t": "B742", "r": "N12345"},      # some other 747-200
     ]}
     got = {a["hex"]: a["label"] for a in pick(feed, now=0)}
-    assert got == {"adfeb5": "E-4B Nightwatch", "adfeb6": "E-4B Nightwatch"}
+    assert got == {"adfeb5": "E-4B Nightwatch", "adfdf8": "VC-25A Air Force One",
+                   "adfeb6": "E-4B Nightwatch"}
+
+
+def test_bomber_and_recon_types():
+    feed = {"ac": [{"hex": "ae0010", "t": "B1", "r": "86-0103"},
+                   {"hex": "ae0011", "t": "R135", "r": "62-4128"}]}
+    got = {a["hex"]: a["label"] for a in pick(feed, now=0)}
+    assert got == {"ae0010": "B-1B Lancer", "ae0011": "RC-135"}
