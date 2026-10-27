@@ -46,10 +46,7 @@ def main(out: Path) -> None:
         from app.aircraft import AircraftWatch
         from app.config import config
         watch = AircraftWatch(config.adsb_url, 0, lambda s: None)
-        try:
-            snap = watch.update(watch.fetch(), time.time())
-        except Exception as e:      # no network: the page says there's no snapshot
-            snap = {"updated_at": None, "source": config.adsb_url, "error": str(e), "aircraft": []}
+        snap = watch.poll(time.time())  # no network: error set, and the page says there's no snapshot
         (api / "aircraft.json").write_text(json.dumps(snap))
         print(f"aircraft snapshot: {len(snap['aircraft'])} watched, error={snap['error']}")
 

@@ -38,6 +38,7 @@ WATCH_REGS.update({r: "WC-135R Constant Phoenix" for r in ("64-14829", "64-14831
 TRAIL_POINTS = 120          # ~1 h at the default 30 s poll
 FORGET_AFTER_S = 15 * 60    # drop an aircraft this long after it was last heard
 MAX_BACKOFF_S = 15 * 60     # a failing feed is retried at least this often
+LAST_POS_MAX_S = 60 * 60    # older last-known positions aren't worth drawing
 
 
 def label_for(ac: dict) -> Optional[str]:
@@ -52,6 +53,23 @@ def label_for(ac: dict) -> Optional[str]:
     return WATCH_TYPES.get(typ)
 
 
+def approx_position(ac: dict, now: float) -> Optional[dict[str, Any]]:
+    """Where an aircraft that isn't broadcasting a position probably is.
+
+    "last": its last broadcast position (readsb's lastPosition), if under LAST_POS_MAX_S old.
+    "rough": readsb's rr_lat/rr_lon, the location of a receiver hearing it, so only
+    within a few hundred km.
+    """
+    last = ac.get("lastPosition") or {}
+    age = last.get("seen_pos")
+    if last.get("lat") is not None and last.get("lon") is not None \
+            and isinstance(age, (int, float)) and age <= LAST_POS_MAX_S:
+        return {"kind": "last", "lat": last["lat"], "lon": last["lon"], "at": now - age}
+    if ac.get("rr_lat") is not None and ac.get("rr_lon") is not None:
+        return {"kind": "rough", "lat": ac["rr_lat"], "lon": ac["rr_lon"], "at": None}
+    return None
+
+
 def pick(feed: dict, now: float) -> list[dict[str, Any]]:
     """Watched aircraft from one feed response, normalized for the UI."""
     out = []
@@ -61,6 +79,7 @@ def pick(feed: dict, now: float) -> list[dict[str, Any]]:
             continue
         alt = ac.get("alt_baro")
         seen = ac.get("seen_pos", ac.get("seen"))   # position age, else any-message age
+        live = ac.get("lat") is not None and ac.get("lon") is not None
         out.append({
             "hex": ac.get("hex"),
             "label": label,
@@ -74,6 +93,8 @@ def pick(feed: dict, now: float) -> list[dict[str, Any]]:
             "track": ac.get("track"),
             "squawk": ac.get("squawk"),
             "seen_at": now - seen if isinstance(seen, (int, float)) else now,
+            # map hint when there's no live position; lat/lon (and the trail) stay live-only
+            "approx": None if live else approx_position(ac, now),
         })
     return out
 
