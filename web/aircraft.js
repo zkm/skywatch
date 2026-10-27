@@ -161,7 +161,8 @@ $("air-rows").addEventListener("click", (e) => {
   if (!l || !air.map) return;
   // on a phone the list is below the map, so bring the map back into view first
   const box = $("map").getBoundingClientRect();
-  if (box.top < 0 || box.bottom > window.innerHeight) {
+  const covered = Math.max(0, document.querySelector(".bar").getBoundingClientRect().bottom);   // pinned header on phones
+  if (box.top < covered || box.bottom > window.innerHeight) {
     const smooth = !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     $("map").scrollIntoView({ behavior: smooth ? "smooth" : "auto", block: "start" });
   }
