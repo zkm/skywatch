@@ -345,6 +345,11 @@ a[target="_blank"]::after { content: "\2197" / ""; margin-left: 2px; font-size: 
     grid-template-areas: "mark mark mark" "listen sql notify" "dial dial dial" "meter meter meter" "src src src";
   }
   .notify { justify-self: start; }
+  .filters { flex-wrap: wrap; }
+  #rows tr td.t { grid-row: 1; grid-column: 1 / -1; }   /* log rows: time / callsign … length / message */
+  #rows tr td:nth-child(2) { grid-row: 2; grid-column: 1; }
+  #rows tr td.num { grid-row: 2; grid-column: 2 / -1; }
+  #rows tr td.code { grid-row: 3; }
 }
 @media (max-width: 420px) {
   .views { gap: 0; padding-inline: 8px; }
