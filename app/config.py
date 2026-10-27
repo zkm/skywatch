@@ -93,7 +93,7 @@ class Config:
 
     # --- strategic aircraft (ADS-B) ---
     adsb_enabled: bool = field(default_factory=lambda: _env("ADSB_ENABLED", "1") == "1")
-    adsb_url: str = field(default_factory=lambda: _env("ADSB_URL", "https://api.adsb.lol/v2/mil"))
+    adsb_url: str = field(default_factory=lambda: _env("ADSB_URL", "https://api.adsb.lol/v2/mil,https://opendata.adsb.fi/api/v2/mil"))
     adsb_poll_s: float = field(default_factory=lambda: float(_env("ADSB_POLL_S", "30")))
 
     @property

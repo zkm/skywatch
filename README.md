@@ -27,7 +27,7 @@ flowchart LR
   F --> S[Squelch] --> W[Whisper] --> P[EAM parser] --> DB[(SQLite + recordings)]
   P --> B[Browsers]
   P --> N[Push / ntfy]
-  A[adsb.lol] --> AF[Aircraft filter] --> B
+  A[adsb.lol / adsb.fi] --> AF[Aircraft filter] --> B
 ```
 
 The squelch cuts out each transmission. Whisper transcribes it, and the parser
@@ -95,7 +95,7 @@ starting point.
 | `ALERT_EMAIL_TO` | | Email these addresses (comma-separated) when an E-4B is first heard on ADS-B |
 | `SMTP_HOST` / `SMTP_PORT` | / `587` | Mail server for those emails; STARTTLS on 587, implicit TLS on 465 |
 | `SMTP_USER` / `SMTP_PASSWORD` / `SMTP_FROM` | | Login, and the sender address (defaults to `SMTP_USER`) |
-| `ADSB_ENABLED` / `ADSB_URL` / `ADSB_POLL_S` | `1` / adsb.lol military feed / `30` | Any ADSBExchange-v2-style feed |
+| `ADSB_ENABLED` / `ADSB_URL` / `ADSB_POLL_S` | `1` / adsb.lol military feed, then adsb.fi's / `30` | Any ADSBExchange-v2-style feeds, comma-separated in order of preference; a failing feed backs off (doubling up to 15 min, longer if it sends `Retry-After`) while the next is used |
 
 **Server**
 
@@ -154,7 +154,7 @@ Code: `app/` (server), `web/` (UI, no build step), `tests/`, `tools/`, `deploy/`
 
 - Receivers: [KiwiSDR](http://kiwisdr.com) and [kiwiclient](https://github.com/jks-prv/kiwiclient)
 - Transcription: [faster-whisper](https://github.com/SYSTRAN/faster-whisper)
-- Aircraft: [adsb.lol](https://adsb.lol), [Leaflet](https://leafletjs.com),
+- Aircraft: [adsb.lol](https://adsb.lol), [adsb.fi](https://adsb.fi), [Leaflet](https://leafletjs.com),
   [OpenStreetMap](https://www.openstreetmap.org/copyright)
 - Inspired by [missileer.watch](https://missileer.watch)
 

@@ -1,7 +1,8 @@
 """Strategic aircraft from public ADS-B: polls an ADSBExchange-v2-style feed.
 
-The default feed is adsb.lol's military list. These aircraft often fly without
-broadcasting, so an empty map is normal; we only see what public receivers hear.
+The default feed is adsb.lol's military list, with adsb.fi's as a fallback. These
+aircraft often fly without broadcasting, so an empty map is normal; we only see what
+public receivers hear.
 """
 from __future__ import annotations
 
@@ -10,6 +11,7 @@ import json
 import logging
 import threading
 import time
+import urllib.error
 import urllib.request
 from typing import Any, Callable, Optional
 
@@ -35,6 +37,7 @@ WATCH_REGS.update({r: "WC-135R Constant Phoenix" for r in ("64-14829", "64-14831
 
 TRAIL_POINTS = 120          # ~1 h at the default 30 s poll
 FORGET_AFTER_S = 15 * 60    # drop an aircraft this long after it was last heard
+MAX_BACKOFF_S = 15 * 60     # a failing feed is retried at least this often
 
 
 def label_for(ac: dict) -> Optional[str]:
@@ -78,13 +81,17 @@ def pick(feed: dict, now: float) -> list[dict[str, Any]]:
 class AircraftWatch:
     def __init__(self, url: str, poll_s: float, on_update: Callable[[dict], None],
                  on_appear: Optional[Callable[[dict], None]] = None) -> None:
-        self.url = url
+        # comma-separated feeds, in order of preference; a failing feed rests while the next one is used
+        self.urls = [u.strip() for u in url.split(",") if u.strip()]
+        self.url = self.urls[0]
         self.poll_s = poll_s
+        self._fails: dict[str, int] = {}
+        self._rest_until: dict[str, float] = {}
         self.on_update = on_update
         self.on_appear = on_appear   # called once per aircraft when it is first heard
         self._known: dict[str, dict] = {}
         self._trails: dict[str, collections.deque] = {}
-        self._snapshot: dict[str, Any] = {"updated_at": None, "source": url, "error": None,
+        self._snapshot: dict[str, Any] = {"updated_at": None, "source": self.url, "error": None,
                                           "aircraft": []}
         self._lock = threading.Lock()
         self._stop = threading.Event()
@@ -101,8 +108,8 @@ class AircraftWatch:
         with self._lock:
             return self._snapshot
 
-    def fetch(self) -> dict:
-        req = urllib.request.Request(self.url, headers={
+    def fetch(self, url: str) -> dict:
+        req = urllib.request.Request(url, headers={
             "User-Agent": "skywatch (+https://github.com/zkm/skywatch)"})
         with urllib.request.urlopen(req, timeout=20) as r:
             return json.load(r)
@@ -124,14 +131,39 @@ class AircraftWatch:
         aircraft = [{**a, "trail": list(self._trails.get(h, []))} for h, a in self._known.items()]
         return {"updated_at": now, "source": self.url, "error": None, "aircraft": aircraft}
 
+    def _rest(self, url: str, err: Exception, now: float) -> None:
+        """Back off a failing feed: doubling from poll_s up to MAX_BACKOFF_S, or longer if it says so."""
+        n = self._fails[url] = self._fails.get(url, 0) + 1
+        wait = min(MAX_BACKOFF_S, self.poll_s * 2 ** (n - 1))
+        if isinstance(err, urllib.error.HTTPError):
+            try:
+                wait = max(wait, float(err.headers.get("Retry-After", "")))
+            except (TypeError, ValueError):   # absent, or an HTTP date
+                pass
+        self._rest_until[url] = now + wait
+        log.warning("ADS-B feed %s failed (%s), resting %.0f s", url, err, wait)
+
+    def poll(self, now: float) -> dict[str, Any]:
+        """One poll: the first feed that isn't resting and answers; the last good list otherwise."""
+        error = "every feed is backing off"
+        for url in self.urls:
+            if self._rest_until.get(url, 0) > now:
+                continue
+            try:
+                feed = self.fetch(url)
+            except Exception as e:  # network, JSON, upstream hiccup: try the next feed
+                self._rest(url, e, now)
+                error = str(e)
+                continue
+            self._fails.pop(url, None)
+            self._rest_until.pop(url, None)
+            return {**self.update(feed, now), "source": url}
+        with self._lock:
+            return {**self._snapshot, "error": error}
+
     def _run(self) -> None:
         while not self._stop.is_set():
-            try:
-                snap = self.update(self.fetch(), time.time())
-            except Exception as e:  # network, JSON, upstream hiccup: keep the last good list
-                log.warning("ADS-B poll failed: %s", e)
-                with self._lock:
-                    snap = {**self._snapshot, "error": str(e)}
+            snap = self.poll(time.time())
             with self._lock:
                 self._snapshot = snap
             self.on_update(snap)
