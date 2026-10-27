@@ -53,6 +53,12 @@ def label_for(ac: dict) -> Optional[str]:
     return WATCH_TYPES.get(typ)
 
 
+def _callsign(raw: Optional[str]) -> Optional[str]:
+    """The flight field, minus placeholders some transponders send ("00000000", "@@@@@@@@")."""
+    cs = (raw or "").strip().upper()
+    return cs if cs.isalnum() and cs.strip("0") else None
+
+
 def approx_position(ac: dict, now: float) -> Optional[dict[str, Any]]:
     """Where an aircraft that isn't broadcasting a position probably is.
 
@@ -85,7 +91,7 @@ def pick(feed: dict, now: float) -> list[dict[str, Any]]:
             "label": label,
             "type": ac.get("t"),
             "reg": (ac.get("r") or "").strip() or None,
-            "callsign": (ac.get("flight") or "").strip() or None,
+            "callsign": _callsign(ac.get("flight")),
             "lat": ac.get("lat"),
             "lon": ac.get("lon"),
             "alt": alt if alt == "ground" or isinstance(alt, (int, float)) else None,
