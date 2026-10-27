@@ -71,3 +71,52 @@ def test_wc135r_by_type_or_tail():
                    {"hex": "ae0002", "t": "K35R", "r": "57-1473"}]}     # an actual tanker
     got = {a["hex"]: a["label"] for a in pick(feed, now=0)}
     assert got == {"ae037f": "WC-135R Constant Phoenix", "ae07c6": "WC-135R Constant Phoenix"}
+
+
+class FakeFeeds(AircraftWatch):
+    """AircraftWatch whose fetch() follows a script: url -> list of responses (dict or exception)."""
+    def __init__(self, script):
+        super().__init__(",".join(script), 30, lambda s: None)
+        self.script, self.calls = script, []
+
+    def fetch(self, url):
+        self.calls.append(url)
+        r = self.script[url].pop(0)
+        if isinstance(r, Exception):
+            raise r
+        return r
+
+
+def too_many(retry_after=None):
+    import urllib.error
+    from email.message import Message
+    h = Message()
+    if retry_after:
+        h["Retry-After"] = retry_after
+    return urllib.error.HTTPError("http://a", 429, "Too Many Requests", h, None)
+
+
+def test_falls_back_and_backs_off_a_failing_feed():
+    w = FakeFeeds({"http://a": [too_many(), too_many(), FEED], "http://b": [FEED, FEED, FEED]})
+    snap = w.poll(now=1000)
+    assert w.calls == ["http://a", "http://b"]
+    assert snap["source"] == "http://b" and snap["error"] is None and snap["aircraft"]
+    w.poll(now=1010)                              # a rests for 30 s
+    assert w.calls[2:] == ["http://b"]
+    w.poll(now=1031)                              # a fails again: rests 60 s
+    assert w.calls[3:] == ["http://a", "http://b"]
+    w.poll(now=1080)
+    assert w.calls[5:] == ["http://b"]
+    snap = w.poll(now=1092)                       # a is back and preferred again
+    assert w.calls[6:] == ["http://a"] and snap["source"] == "http://a"
+
+
+def test_retry_after_and_all_feeds_down():
+    w = FakeFeeds({"http://a": [too_many("600")], "http://b": [OSError("down"), OSError("down")]})
+    snap = w.poll(now=1000)
+    assert w.calls == ["http://a", "http://b"]
+    assert snap["error"] == "down" and snap["updated_at"] is None    # nothing good yet
+    w.poll(now=1031)                              # b rested 30 s; a still resting (Retry-After 600)
+    assert w.calls[2:] == ["http://b"]
+    snap = w.poll(now=1050)                       # both resting: no requests at all
+    assert w.calls[3:] == [] and snap["error"] == "every feed is backing off"

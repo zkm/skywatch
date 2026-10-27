@@ -108,9 +108,9 @@ async function airOpen() {
     air.map = L.map("map", { worldCopyJump: true, zoomControl: true }).setView([39, -97], 4);
     L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
       maxZoom: 12,
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors · positions: <a href="https://adsb.lol">adsb.lol</a>',
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors · positions: <a href="https://adsb.lol">adsb.lol</a>, <a href="https://adsb.fi">adsb.fi</a>',
     }).addTo(air.map);
-    // attribution links (Leaflet, OpenStreetMap, adsb.lol) open in a new tab, like the site's other external links
+    // attribution links (Leaflet, OpenStreetMap, the ADS-B feeds) open in a new tab, like the site's other external links
     air.map.getContainer().querySelectorAll(".leaflet-control-attribution a[href^='http']").forEach((a) => {
       a.target = "_blank";
       a.rel = "noopener";
