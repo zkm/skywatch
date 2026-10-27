@@ -1,13 +1,19 @@
 #!/bin/sh
 # Nightly Skywatch snapshot: consistent SQLite copy plus the keys that can't be regenerated.
 # Keeps 14 days in /var/backups/skywatch. Audio stays in /var/lib/skywatch/audio (pulled off-site).
+# The snapshots hold the push key and voter salt: readable by root and the $reader group only,
+# which is the admin account that pulls them off-site over SSH.
 set -u
 src=/var/lib/skywatch dst=/var/backups/skywatch stamp=$(date -u +%Y%m%dT%H%MZ)
-mkdir -p "$dst" && chmod 700 "$dst"
+reader=zkm
+group=root
+getent group "$reader" >/dev/null && group=$reader
+mkdir -p "$dst" && chown "root:$group" "$dst" && chmod 750 "$dst"
 tmp=$(mktemp -d) || exit 1
 if sqlite3 "$src/skywatch.sqlite3" ".backup $tmp/skywatch.sqlite3" \
    && cp -p "$src/vapid_private.pem" "$src/voter.salt" "$tmp/" \
-   && tar -C "$tmp" -czf "$dst/skywatch-$stamp.tar.gz" .; then
+   && tar -C "$tmp" -czf "$dst/skywatch-$stamp.tar.gz" . \
+   && chown "root:$group" "$dst/skywatch-$stamp.tar.gz" && chmod 640 "$dst/skywatch-$stamp.tar.gz"; then
   echo "backup ok: $dst/skywatch-$stamp.tar.gz"
   find "$dst" -name "skywatch-*.tar.gz" -mtime +14 -delete
 else

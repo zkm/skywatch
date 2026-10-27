@@ -8,7 +8,7 @@ Secrets are not here: they live only in `/opt/skywatch-deploy/skywatch.env` on t
 | `compose.yml`, `Caddyfile` | `/opt/skywatch-deploy/` | Skywatch behind Caddy (automatic HTTPS). Skywatch publishes no port; data in `/var/lib/skywatch` |
 | `skywatch-autodeploy` | `/usr/local/sbin/` | Deploys `origin/main` when it changes and its CI `test` check passed, health-checks the site, rolls back and emails on failure |
 | `skywatch-autodeploy.service`, `.timer` | `/etc/systemd/system/` | Runs the deploy check every 5 minutes |
-| `skywatch-backup` | `/usr/local/sbin/` | Nightly SQLite snapshot plus the push key and voter salt, 14 days kept in `/var/backups/skywatch` |
+| `skywatch-backup` | `/usr/local/sbin/` | Nightly SQLite snapshot plus the push key and voter salt, 14 days kept in `/var/backups/skywatch` (mode 750, snapshots 640, group `zkm` so the admin account can pull them off-site) |
 | `skywatch-backup.cron` | `/etc/cron.d/skywatch-backup` | Runs the backup at 03:30 UTC |
 
 `/opt/skywatch` is a plain clone of this repo's `main`; the deploy script fast-forwards it.
@@ -23,10 +23,22 @@ voice peaks around 9 dB, so the default 8 dB misses most of it.
 
 Merging to `main` is the deploy: within about 5 minutes of CI passing, the server picks it up.
 
+Log in as `zkm` (key-only, in the `sudo` group; root login is disabled), e.g. with this in `~/.ssh/config`:
+
+```
+Host do-skywatch
+  HostName 209.97.148.65
+  User zkm
+  IdentityFile ~/.ssh/id_ed25519
+```
+
+The commands below need `sudo`. Off-site copies are pulled nightly as `zkm` with
+`rsync -a do-skywatch:/var/backups/skywatch/ …` and `…:/var/lib/skywatch/audio/ …`.
+
 ```sh
-journalctl -u skywatch-autodeploy -n 50     # recent deploys and checks
-systemctl start skywatch-autodeploy          # deploy now instead of waiting
-docker compose -f /opt/skywatch-deploy/compose.yml logs -f skywatch
+sudo journalctl -u skywatch-autodeploy -n 50     # recent deploys and checks
+sudo systemctl start skywatch-autodeploy          # deploy now instead of waiting
+sudo docker compose -f /opt/skywatch-deploy/compose.yml logs -f skywatch
 ```
 
 Deploying by hand is the same as what the script does:
@@ -36,6 +48,9 @@ Deploying by hand is the same as what the script does:
 
 1. Create the droplet with your SSH key, then `apt install docker.io docker-compose-v2 sqlite3 git`,
    allow 22, 80, 443/tcp and 443/udp in `ufw`, and add 1 GB of swap.
+   Add the admin user (`adduser zkm && usermod -aG sudo zkm`, copy root's `~/.ssh/authorized_keys`
+   to `/home/zkm/.ssh/` owned by `zkm`), check that `ssh zkm@…` and `sudo -v` work, then set
+   `PermitRootLogin no` in `/etc/ssh/sshd_config` and `systemctl reload ssh`.
 2. `git clone https://github.com/zkm/skywatch.git /opt/skywatch`, copy the files above into place,
    and write `/opt/skywatch-deploy/skywatch.env` (mode 600) with the SMTP, alert and audio-source settings.
 3. Restore `/var/lib/skywatch` from a backup if you have one: `vapid_private.pem` and `voter.salt`
