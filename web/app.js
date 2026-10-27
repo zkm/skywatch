@@ -61,6 +61,14 @@ function route() {
   hooks.view?.(name);
 }
 window.addEventListener("hashchange", route);
+// the logo goes home without a reload, so live audio keeps playing (modified clicks still open a tab)
+$("home").addEventListener("click", (e) => {
+  if (e.button || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+  e.preventDefault();
+  if (location.hash) history.pushState(null, "", location.pathname + location.search);
+  route();
+  window.scrollTo(0, 0);
+});
 // the views live behind hash routes, so the skip link focuses the visible one instead of navigating
 $("skip").addEventListener("click", (e) => { e.preventDefault(); $(`view-${currentView()}`).focus(); });
 document.addEventListener("DOMContentLoaded", route);   // after trainer.js / aircraft.js have registered
