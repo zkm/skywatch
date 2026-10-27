@@ -33,6 +33,12 @@ def test_vad_off_by_default_and_opt_in(monkeypatch, tmp_path):
     assert t.model.calls[0]["vad_filter"] is True
 
 
+# production message 44: 3 min 16 s of noise that Whisper "counted" through
+COUNTING = ("1, 1, 1, 7, 5, 8, 8, 9, 9, 9, 10, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, "
+            "23, 24, 25, 26, 27, 28, 28, 28, 29, 29, 30, 30, 31, 32, 32, 32, 33, 33, 34, 34, 35, "
+            "35, 36, 36, 36, 37, 37, 38, 38, 38, 39, 39, 40, 39, 40, 40, 41, 41, 42, 42, 42, 42, "
+            "42, 42, 43, 42, 43, 42, 43, 42, 43, 42, 43, 42, 43, 43, 42, 43, 43, 42, 43, 43, 43")
+
 # Transcripts from real recordings: three 5-10 minute noise blocks the squelch let
 # through from the missileer.watch stream, and real HFGCS voice traffic.
 NOISE = [
@@ -41,6 +47,8 @@ NOISE = [
     "Thank you for watching!",
     "Thank you very much. Thank you. Thank you very much.",
     "",
+    COUNTING,
+    "one, one, two, three, four, five, six, seven, eight, nine",
 ]
 VOICE = [
     "Cupling Cupling this is Splendid Splendid my station authenticates Charlie Alpha Charlie with Juliet",
@@ -115,3 +123,9 @@ def test_careful_pass_kept_only_if_it_still_parses_as_eam(monkeypatch, tmp_path)
     calls, text = run_two_pass(monkeypatch, tmp_path, fast, words("X-ray Yankee Zulu"))
     assert len(calls) == 2
     assert text == " ".join(w.text for w in fast)   # careful pass hallucinated: keep the fast copy
+
+
+def test_counting_hallucination_is_not_an_eam():
+    from app.phonetic import parse
+    p = parse(words(COUNTING))
+    assert p.kind == "voice"
