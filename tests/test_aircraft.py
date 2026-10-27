@@ -149,3 +149,10 @@ def test_approx_positions_dont_make_trails():
     w = AircraftWatch("http://example.invalid", 30, lambda s: None)
     snap = w.update({"ac": [{"hex": "ae6bec", "t": "B1", "rr_lat": 44.7, "rr_lon": -102.4}]}, now=0)
     assert snap["aircraft"][0]["trail"] == []
+
+
+def test_placeholder_callsigns_are_dropped():
+    feed = {"ac": [{"hex": f"ae00{i}", "t": "B52", "flight": f} for i, f in
+                   enumerate(["00000000", "@@@@@@@@", "        ", "BUFF51  ", "0"])]}
+    got = [a["callsign"] for a in pick(feed, now=0)]
+    assert got == [None, None, None, "BUFF51", None]

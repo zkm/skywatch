@@ -57,12 +57,16 @@ function renderAirTable(snap) {
   $("air-meta").textContent = airMeta(snap);
   const list = [...snap.aircraft].sort((a, b) => b.seen_at - a.seen_at);
   $("air-rows").innerHTML = list.length
-    ? list.map((a) => `<tr data-hex="${esc(a.hex)}">
-        <td>${!where(a) ? esc(a.label)    // nothing to show on the map
+    ? list.map((a) => {
+      // empty cells show "—" in the desktop table and are hidden in the phone card layout
+      const cell = (cls, label, value) => `<td class="${cls}${value ? "" : " empty"}" data-label="${label}">${value ? esc(value) : "—"}</td>`;
+      return `<tr data-hex="${esc(a.hex)}"${where(a) ? ' class="on-map"' : ""}>
+        <td class="ac-name">${!where(a) ? esc(a.label)    // nothing to show on the map
           : `<button type="button" class="rowbtn" aria-label="${esc(a.label)}, show on map">${esc(a.label)}</button>`}</td>
-        <td class="code" data-label="Callsign">${esc(a.callsign || "—")}</td><td data-label="Tail">${esc(a.reg || "—")}</td>
-        <td class="num" data-label="Altitude">${altText(a)}</td><td class="num" data-label="Speed">${a.gs != null ? `${Math.round(a.gs)} kt` : "—"}</td>
-        <td class="num" data-label="Heard">${posNote(a)}${ago(a.seen_at)}</td></tr>`).join("")
+        ${cell("code ac-cs", "Callsign", a.callsign)}${cell("ac-tail", "Tail", a.reg)}
+        ${cell("num ac-alt", "Altitude", a.alt != null ? altText(a) : "")}${cell("num ac-spd", "Speed", a.gs != null ? `${Math.round(a.gs)} kt` : "")}
+        <td class="num ac-heard" data-label="Heard">${posNote(a)}<span class="ago">${ago(a.seen_at)}</span></td></tr>`;
+    }).join("")
     : `<tr class="empty-row"><td colspan="6">${DEMO
       ? "None of the watched aircraft were being heard when this snapshot was taken. A running Skywatch server updates this every 30 seconds."
       : "None of the watched aircraft are being heard right now. They often fly without broadcasting, so check back later."}</td></tr>`;
@@ -95,14 +99,15 @@ function renderMap(snap) {
           <path d="M12 2 L14 10 L22 14 L22 16 L14 14 L13.5 19 L16 21 L16 22 L12 21 L8 22 L8 21 L10.5 19 L10 14 L2 16 L2 14 L10 10 Z" fill="${ink}" stroke="${signal}" stroke-width="1"/></svg>`,
       }));
     }
-    const tip = w.kind === "last" ? ` · ${ago(w.at)}` : w.kind === "rough" ? " · rough area" : "";
+    const tip = w.kind === "last" ? ` · ${ago(w.at).replace(" ago", "")}` : "";
     l.mark.unbindTooltip().bindTooltip(esc(short(a.label) + tip), w.kind === "rough"
       ? { permanent: true, direction: "center", className: "ac-tip" }
       : { permanent: true, direction: "right", offset: [12, 0], className: "ac-tip" });
     const note = w.kind === "last" ? `<br><em>Not broadcasting a position now. Shown where it last did, ${ago(w.at)}.</em>`
       : w.kind === "rough" ? "<br><em>Not broadcasting a position. The circle is a rough area around a receiver that hears it.</em>" : "";
     l.mark.bindPopup(`<strong>${esc(a.label)}</strong><br>${esc(a.callsign || "no callsign")} · ${esc(a.reg || "tail unknown")}<br>
-      ${altText(a)}${a.gs != null ? ` · ${Math.round(a.gs)} kt` : ""}${a.squawk ? ` · squawk ${esc(a.squawk)}` : ""}<br>Heard ${ago(a.seen_at)}${note}`);
+      ${altText(a)}${a.gs != null ? ` · ${Math.round(a.gs)} kt` : ""}${a.squawk ? ` · squawk ${esc(a.squawk)}` : ""}<br>Heard ${ago(a.seen_at)}${note}`,
+      { maxWidth: 230, autoPanPaddingTopLeft: [52, 12] });   // keep it clear of the zoom buttons
     l.trail.setLatLngs(a.trail || []);
   }
   for (const [hex, l] of air.layers) {
@@ -148,7 +153,15 @@ async function airOpen() {
 $("air-rows").addEventListener("click", (e) => {
   const tr = e.target.closest("tr[data-hex]");
   const l = tr && air.layers.get(tr.dataset.hex);
-  if (l && air.map) { air.map.setView(l.mark.getLatLng(), Math.max(air.map.getZoom(), l.kind === "rough" ? 5 : 6)); l.mark.openPopup(); }
+  if (!l || !air.map) return;
+  // on a phone the list is below the map, so bring the map back into view first
+  const box = $("map").getBoundingClientRect();
+  if (box.top < 0 || box.bottom > window.innerHeight) {
+    const smooth = !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    $("map").scrollIntoView({ behavior: smooth ? "smooth" : "auto", block: "start" });
+  }
+  air.map.setView(l.mark.getLatLng(), Math.max(air.map.getZoom(), l.kind === "rough" ? 5 : 6));
+  l.mark.openPopup();
 });
 
 hooks.aircraft = (snap) => renderAir(snap);
