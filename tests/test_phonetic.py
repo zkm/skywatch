@@ -107,3 +107,10 @@ def test_plain_voice():
 def test_unstructured_long_run_is_eam():
     p = parse(words(spell(BODY)))
     assert p.kind == "eam" and p.body == BODY
+
+
+def test_unmarked_run_needs_letters_and_a_sane_length():
+    assert parse(words(" ".join(["four two"] * 15))).kind == "voice"          # 30 digits, no letters
+    assert parse(words(spell(BODY * 4))).kind == "voice"                      # 120 chars, no markers
+    mixed = "Seven Seven Alpha Two Bravo Nine Three Charlie One Delta Four Echo Five Six Eight Foxtrot Golf Two Hotel Three"
+    assert parse(words(mixed)).kind == "eam"                                  # 20 chars, 8 letters

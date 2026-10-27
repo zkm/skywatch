@@ -45,6 +45,10 @@ CARDINAL = {
 
 DEFAULT_EAM_LEN = 30
 MIN_EAM_RUN = 20  # a char run this long with no markers is still treated as an EAM
+# ...unless it doesn't look like one: Whisper "counting" through minutes of noise ("1, 1, 7,
+# 8, 9, 10 ... 42, 43, 43, 43") is a long digits-only run. Real bodies mix letters and digits.
+MAX_UNMARKED_RUN = 100
+MIN_LETTER_SHARE = 0.25
 
 
 @dataclass
@@ -305,6 +309,9 @@ def parse(words: list[Word], min_prob: float = 0.45) -> Parsed:
         if b - a < MIN_EAM_RUN:
             return Parsed(kind="voice", callsign=callsign)
         c1 = _chars_between(toks, a, b)
+        letters = sum(c.c.isalpha() for c in c1)
+        if len(c1) > MAX_UNMARKED_RUN or letters < MIN_LETTER_SHARE * len(c1):
+            return Parsed(kind="voice", callsign=callsign)
         c2 = []
         sa, sal = _find_any(seq, SAY_AGAIN, b)
         if sa >= 0:

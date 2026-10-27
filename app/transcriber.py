@@ -8,7 +8,7 @@ from typing import Protocol
 import numpy as np
 
 from .config import Config
-from .phonetic import Word, parse
+from .phonetic import CARDINAL, Word, parse
 
 log = logging.getLogger("skywatch.asr")
 
@@ -46,7 +46,10 @@ def looks_like_noise(text: str) -> bool:
     t = text.lower()
     if any(p in t for p in STOCK):
         return True
-    words = {w for w in re.findall(r"[a-z0-9]+(?:-[a-z0-9]+)*", t) if w not in FILLER}
+    tokens = re.findall(r"[a-z0-9]+(?:-[a-z0-9]+)*", t)
+    if len(tokens) >= 8 and all(w.isdigit() or w in CARDINAL for w in tokens):
+        return True             # "1, 1, 1, 7, 5, 8, 8, 9, 9, 9, 10 ...": counting through noise
+    words = {w for w in tokens if w not in FILLER}
     return len(words) <= 3      # "Shh Shh Shh", "Mm hmm. Z-ray Yankee Zulu"
 
 
