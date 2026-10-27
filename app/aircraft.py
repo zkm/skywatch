@@ -23,12 +23,15 @@ WATCH_TYPES = {
     "B2": "B-2 Spirit",
     "B1": "B-1B Lancer",
     "C135": "WC-135 / OC-135",
+    "W135": "WC-135R Constant Phoenix",
     "R135": "RC-135",
 }
 # E-4B airframes, in case the feed types them oddly
 WATCH_REGS = {r: "E-4B Nightwatch" for r in ("73-1676", "73-1677", "74-0787", "75-0125")}
 # the two "Air Force One" jets, which feeds type as a 747-200 like the E-4B
 WATCH_REGS.update({r: "VC-25A Air Force One" for r in ("82-8000", "92-9000")})
+# WC-135Rs, converted KC-135R tankers, in case a feed types them K35R
+WATCH_REGS.update({r: "WC-135R Constant Phoenix" for r in ("64-14829", "64-14831", "64-14836")})
 
 TRAIL_POINTS = 120          # ~1 h at the default 30 s poll
 FORGET_AFTER_S = 15 * 60    # drop an aircraft this long after it was last heard

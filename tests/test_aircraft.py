@@ -63,3 +63,11 @@ def test_bomber_and_recon_types():
                    {"hex": "ae0011", "t": "R135", "r": "62-4128"}]}
     got = {a["hex"]: a["label"] for a in pick(feed, now=0)}
     assert got == {"ae0010": "B-1B Lancer", "ae0011": "RC-135"}
+
+
+def test_wc135r_by_type_or_tail():
+    feed = {"ac": [{"hex": "ae037f", "t": "W135", "r": "64-14829"},
+                   {"hex": "ae07c6", "t": "K35R", "r": "64-14831"},     # typed as the tanker it was
+                   {"hex": "ae0002", "t": "K35R", "r": "57-1473"}]}     # an actual tanker
+    got = {a["hex"]: a["label"] for a in pick(feed, now=0)}
+    assert got == {"ae037f": "WC-135R Constant Phoenix", "ae07c6": "WC-135R Constant Phoenix"}
