@@ -36,11 +36,11 @@ function where(a) {
   if (a.lat != null && a.lon != null) return { kind: "live", lat: a.lat, lon: a.lon };
   return a.approx || null;
 }
-function posNote(a) {
+function posLabel(a) {
   const w = where(a);
-  if (!w) return "no position · ";
-  if (w.kind === "last") return `position ${ago(w.at).replace(" ago", " old")} · `;
-  if (w.kind === "rough") return "rough area · ";
+  if (!w) return "no position";
+  if (w.kind === "last") return `position ${ago(w.at).replace(" ago", " old")}`;
+  if (w.kind === "rough") return "rough area";
   return "";
 }
 
@@ -58,14 +58,19 @@ function renderAirTable(snap) {
   const list = [...snap.aircraft].sort((a, b) => b.seen_at - a.seen_at);
   $("air-rows").innerHTML = list.length
     ? list.map((a) => {
-      // empty cells show "—" in the desktop table and are hidden in the phone card layout
-      const cell = (cls, label, value) => `<td class="${cls}${value ? "" : " empty"}" data-label="${label}">${value ? esc(value) : "—"}</td>`;
+      const pos = posLabel(a);
+      const alt = a.alt != null ? altText(a) : "", spd = a.gs != null ? `${Math.round(a.gs)} kt` : "";
+      // desktop: one cell per column. Phone: the two .ac-phone cells instead, as a two-line list
+      // ("B-52H … on ground" over "61-0031 · rough area … just now"); CSS shows one set or the other
+      const line = (...parts) => parts.filter(Boolean).map(esc).join(" · ");
       return `<tr data-hex="${esc(a.hex)}"${where(a) ? ' class="on-map"' : ""}>
         <td class="ac-name">${!where(a) ? esc(a.label)    // nothing to show on the map
           : `<button type="button" class="rowbtn" aria-label="${esc(a.label)}, show on map">${esc(a.label)}</button>`}</td>
-        ${cell("code ac-cs", "Callsign", a.callsign)}${cell("ac-tail", "Tail", a.reg)}
-        ${cell("num ac-alt", "Altitude", a.alt != null ? altText(a) : "")}${cell("num ac-spd", "Speed", a.gs != null ? `${Math.round(a.gs)} kt` : "")}
-        <td class="num ac-heard" data-label="Heard">${posNote(a)}<span class="ago">${ago(a.seen_at)}</span></td></tr>`;
+        <td class="code ac-desk">${esc(a.callsign || "—")}</td><td class="ac-desk">${esc(a.reg || "—")}</td>
+        <td class="num ac-desk">${esc(alt || "—")}</td><td class="num ac-desk">${esc(spd || "—")}</td>
+        <td class="num ac-phone ac-sum">${line(alt, spd)}</td>
+        <td class="ac-phone ac-sub">${line(a.reg, a.callsign, pos)}</td>
+        <td class="num ac-heard">${pos ? `<span class="ac-desk">${esc(pos)} · </span>` : ""}${ago(a.seen_at)}</td></tr>`;
     }).join("")
     : `<tr class="empty-row"><td colspan="6">${DEMO
       ? "None of the watched aircraft were being heard when this snapshot was taken. A running Skywatch server updates this every 30 seconds."
