@@ -207,7 +207,7 @@ class WebFiles(StaticFiles):
         return resp
 
 
-@app.get("/")
+@app.api_route("/", methods=["GET", "HEAD"])
 def index():
     return FileResponse(WEB_DIR / "index.html", headers={"Cache-Control": "no-cache"})
 
