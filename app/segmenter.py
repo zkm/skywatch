@@ -9,6 +9,10 @@ The floor is frozen while open, so if the background noise rises mid-transmissio
 the level never falls back below it. A transmission that runs to MAX_TX_S is
 taken as a sign of that: the floor is re-measured from the last few seconds
 instead of reopening straight away on the same noise.
+
+Such a run is usually static, and Whisper spends minutes of CPU on it.
+`level_spread_db` tells the two apart before transcription: speech rises and
+falls between syllables and words, while static stays within a few dB.
 """
 from __future__ import annotations
 
@@ -34,6 +38,29 @@ class Transmission:
     @property
     def duration(self) -> float:
         return len(self.samples) / self.sample_rate
+
+    def level_spread_db(self) -> float:
+        """10th-to-90th percentile range of the 200 ms level, in dB."""
+        return level_spread_db(self.samples, self.sample_rate)
+
+
+def level_spread_db(samples: np.ndarray, sample_rate: int) -> float:
+    frame = sample_rate * FRAME_MS // 1000
+    n = len(samples) // frame
+    if n < 10:
+        return 0.0
+    fr = samples[: n * frame].astype(np.float64).reshape(n, frame)
+    db = 20.0 * np.log10(np.maximum(np.sqrt(np.mean(fr ** 2, axis=1)), 1e-3) / 32768.0)
+    level = np.convolve(db, np.ones(10) / 10, "valid")   # same 200 ms smoothing as the squelch
+    p10, p90 = np.percentile(level, [10, 90])
+    return float(p90 - p10)
+
+
+def is_noise_run(tx: Transmission, max_tx_s: float, min_spread_db: float) -> bool:
+    """True for a transmission that ran to the length limit on steady static."""
+    if min_spread_db <= 0 or tx.duration < 0.95 * max_tx_s:
+        return False
+    return tx.level_spread_db() < min_spread_db
 
 
 class Segmenter:
