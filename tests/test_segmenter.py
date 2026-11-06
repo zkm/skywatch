@@ -63,3 +63,17 @@ def test_stale_floor_is_remeasured_after_a_max_length_transmission():
     # back-to-back 60 s captures, and the later real transmission still opens it
     assert sum(t.duration >= 59 for t in txs) == 1, [round(t.duration) for t in txs]
     assert any(5 < t.duration < 15 for t in txs), [round(t.duration) for t in txs]
+
+
+def test_noise_run_dropped_but_long_voice_kept():
+    from app.segmenter import Transmission, is_noise_run
+    rng = np.random.default_rng(3)
+    static = Transmission(0.0, noise(300, 3000, rng), SR, -20.0, -30.0)
+    speech = Transmission(0.0, np.concatenate([voice(150, 6000, rng)] * 2), SR, -10.0, -30.0)
+    assert static.level_spread_db() < 3.0
+    assert speech.level_spread_db() > 3.0
+    assert is_noise_run(static, 300, 3.0)
+    assert not is_noise_run(speech, 300, 3.0)
+    assert not is_noise_run(static, 300, 0)          # disabled
+    short = Transmission(0.0, noise(60, 3000, rng), SR, -20.0, -30.0)
+    assert not is_noise_run(short, 300, 3.0)         # only max-length runs are checked

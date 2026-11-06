@@ -51,6 +51,9 @@ class Config:
     preroll_s: float = field(default_factory=lambda: float(_env("PREROLL_S", "1.0")))
     min_tx_s: float = field(default_factory=lambda: float(_env("MIN_TX_S", "4.0")))
     max_tx_s: float = field(default_factory=lambda: float(_env("MAX_TX_S", "300")))
+    # a transmission that hits MAX_TX_S with less level variation than this is static
+    # and is dropped before transcription; real EAMs measured 3.7 dB and up, 0 disables
+    noise_spread_db: float = field(default_factory=lambda: float(_env("NOISE_SPREAD_DB", "3.0")))
 
     # --- transcription ---
     asr_backend: str = field(default_factory=lambda: _env("ASR_BACKEND", "whisper"))

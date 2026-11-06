@@ -13,7 +13,7 @@ import numpy as np
 from .config import Config
 from .live import EventBus, LiveEncoder
 from .phonetic import parse
-from .segmenter import Segmenter, Transmission
+from .segmenter import Segmenter, Transmission, is_noise_run
 from .source import SourceState, make_source
 from .store import Store
 from .transcriber import looks_like_noise, make_transcriber
@@ -63,6 +63,10 @@ class Pipeline:
         log.info("source ended")
 
     def _enqueue(self, tx: Transmission) -> None:
+        if is_noise_run(tx, self.cfg.max_tx_s, self.cfg.noise_spread_db):
+            log.info("dropped %.0fs transmission as static before ASR: level spread %.1f dB",
+                     tx.duration, tx.level_spread_db())
+            return
         log.info("transmission: %.1fs, peak %.1f dB over floor %.1f dB",
                  tx.duration, tx.peak_db, tx.floor_db)
         self.events.emit("transmission", {"started_at": tx.started_at,
