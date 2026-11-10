@@ -114,3 +114,40 @@ def test_unmarked_run_needs_letters_and_a_sane_length():
     assert parse(words(spell(BODY * 4))).kind == "voice"                      # 120 chars, no markers
     mixed = "Seven Seven Alpha Two Bravo Nine Three Charlie One Delta Four Echo Five Six Eight Foxtrot Golf Two Hotel Three"
     assert parse(words(mixed)).kind == "eam"                                  # 20 chars, 8 letters
+
+
+# The cases below come from a real KPH recording (2026-10-22 22:00Z).
+
+def test_xray_split_into_two_words_is_one_character():
+    # Whisper emits "X-ray" as "X" + "-ray", often with a low probability on the "X"
+    ws = words("Message follows. Charlie Zulu X -ray Seven Oscar Golf This is Offutt, out.")
+    ws[4].prob = 0.08                                    # the "X" piece
+    p = parse(ws)
+    assert p.body == "CZX7OG"
+    assert p.chars[2].t0 == ws[4].start and p.chars[2].t1 == ws[5].end
+
+
+def test_misheard_say_again_still_splits_the_reads():
+    for marker in ("X-ray again", "X -ray again", "again"):
+        text = eam_text(BODY, BODY).replace("I say again", marker)
+        p = parse(words(text))
+        assert (p.copy1, p.copy2, p.body) == (BODY, BODY, BODY), marker
+
+
+def test_announced_length_as_numeral_or_digits():
+    body = BODY[:28] + "AB"
+    for said in ("30", "three zero", "thirty"):
+        p = parse(words(eam_text(body, body, f"Message of {said} characters follows.")))
+        assert p.expected_len == 30, said
+    body = BODY[:28]
+    p = parse(words(eam_text(body, body, "Message of two eight characters follows.")))
+    assert p.expected_len == 28
+
+
+def test_second_read_cut_short_loses_to_the_full_first_read():
+    # 32 announced; the first read has 30 with one unclear, the second was cut off at 12
+    text = (f"Message of thirty two characters follows. {spell(BODY[:15])} Banana "
+            f"{spell(BODY[16:])} I say again {spell(BODY[:12])}")
+    p = parse(words(text))
+    assert p.expected_len == 32 and len(p.copy1) == 30 and len(p.copy2) == 12
+    assert p.body == BODY[:15] + "?" + BODY[16:]

@@ -1,7 +1,11 @@
 """Import a recording into the archive, as if Skywatch had copied it live.
 
-    DATA_DIR=./data PYTHONPATH=. python tools/import_audio.py clip.opus \\
+    DATA_DIR=./data python tools/import_audio.py clip.opus \\
         --at 2026-09-24T16:36:10Z --source "missileer.watch (Iceland receiver)" --tries 3
+
+In the Docker image, stop the live service first: a second Whisper doesn't fit in 2 GB.
+
+    docker compose run --rm skywatch python tools/import_audio.py /data/import/clip.opus ...
 
 The recording goes through the same steps as live traffic (two-pass Whisper, the
 parser, the noise filter) and is stored with its audio, so it shows up in the log,
@@ -25,6 +29,7 @@ from typing import Optional
 
 import numpy as np
 
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # run from anywhere, no PYTHONPATH
 from app.config import Config, config
 from app.phonetic import parse
 from app.pipeline import encode_mp3
