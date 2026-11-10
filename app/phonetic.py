@@ -101,9 +101,24 @@ def _norm(raw: str) -> str:
     return re.sub(r"[^a-z0-9]", "", s)
 
 
+def _join_split_xray(words: list[Word]) -> list[Word]:
+    """Whisper often emits "X-ray" as two words, "X" and "-ray"; put them back together.
+    The "X" piece usually carries a low probability on its own, so the pair takes the
+    higher of the two."""
+    out: list[Word] = []
+    for w in words:
+        prev = out[-1] if out else None
+        if prev is not None and _norm(prev.text) == "x" and _norm(w.text) == "ray":
+            tail = w.text[len(w.text) - len(w.text.lstrip(" -")):]
+            out[-1] = Word("X-" + tail, prev.start, w.end, max(prev.prob, w.prob))
+        else:
+            out.append(w)
+    return out
+
+
 def tokenize(words: list[Word], min_prob: float) -> list[Tok]:
     toks: list[Tok] = []
-    for w in words:
+    for w in _join_split_xray(words):
         n = _norm(w.text)
         if not n:
             continue
@@ -172,7 +187,9 @@ def _find_any(seq: list[str], phrases: list[list[str]], start: int = 0) -> tuple
     return best
 
 
-SAY_AGAIN = [["i", "say", "again"], ["say", "again"]]
+# "I say again" comes out as "X-ray again" or a bare "again" often enough. Only searched
+# for after the body starts, where "again" means nothing else.
+SAY_AGAIN = [["i", "say", "again"], ["say", "again"], ["xray", "again"], ["again"]]
 STAND_BY = [["stand", "by"], ["standby"]]
 THIS_IS = [["this", "is"]]
 END_MARKERS = [["this", "is"], ["out"], ["more", "to", "follow"]]
@@ -180,14 +197,17 @@ END_MARKERS = [["this", "is"], ["out"], ["more", "to", "follow"]]
 FOLLOWS = [["follows"], ["followed"], ["following"], ["follow"]]
 
 
-def _parse_cardinal(words: list[str]) -> Optional[int]:
-    total, seen = 0, False
-    for w in words:
-        if w.isdigit():
-            total += int(w); seen = True
-        elif w in CARDINAL:
-            total += CARDINAL[w]; seen = True
-    return total if seen else None
+def _parse_count(toks: list[Tok]) -> Optional[int]:
+    """The N in "message of N characters". Digits read one by one join up ("three two",
+    or a numeral the tokenizer split, is 32); tens words add ("thirty two", "twenty eight")."""
+    total, digits, seen = 0, "", False
+    for t in toks:
+        v = t.alt if t.kind == "char" and t.value == "?" and t.alt else t.value
+        if t.kind == "char" and v.isdigit():
+            digits += v; seen = True
+        elif t.kind == "word" and v in CARDINAL:
+            total += CARDINAL[v]; seen = True
+    return total + int(digits or 0) if seen else None
 
 
 def _chars_between(toks: list[Tok], a: int, b: int) -> list[Char]:
@@ -215,9 +235,10 @@ def merge_copies(c1: list[Char], c2: list[Char], expected: Optional[int]) -> lis
     if not c1:
         return c2
     if len(c1) != len(c2):
-        # can't align safely; prefer the copy matching the expected length, then fewer '?'
+        # can't align safely; prefer the copy closest to the expected length (a read cut
+        # short when the signal dropped is common), then fewer '?'
         def score(c: list[Char]) -> tuple[int, int]:
-            return (0 if expected and len(c) == expected else 1, sum(x.c == "?" for x in c))
+            return (abs(len(c) - expected) if expected else 0, sum(x.c == "?" for x in c))
         return min((c1, c2), key=score)
     out = []
     for a, b in zip(c1, c2):
@@ -291,7 +312,7 @@ def parse(words: list[Word], min_prob: float = 0.45) -> Parsed:
         if 0 <= f - m <= 5:
             body_start = f + 1
             if f - m > 1:
-                expected = _parse_cardinal(seq[m + 1:f])
+                expected = _parse_count(toks[m + 1:f])
             break
         m = _find(seq, ["message"], m + 1)
 
