@@ -172,7 +172,8 @@ Code: `app/` (server), `web/` (UI, no build step), `tests/`, `tools/`, `deploy/`
 - Transcription: [faster-whisper](https://github.com/SYSTRAN/faster-whisper)
 - Aircraft: [adsb.lol](https://adsb.lol), [adsb.fi](https://adsb.fi), [Leaflet](https://leafletjs.com),
   [OpenStreetMap](https://www.openstreetmap.org/copyright)
-- Inspired by [missileer.watch](https://missileer.watch)
+- Inspired by [missileer.watch](https://missileer.watch); some copy-trainer recordings and
+  their reference copies are theirs, released under [CC0](https://creativecommons.org/publicdomain/zero/1.0/)
 
 **Background reading:** [Priyom](https://priyom.org/military-stations/united-states/hfgcs) ·
 [Number Stations Research](https://www.numbers-stations.com/usa/hfgcs/) ·
