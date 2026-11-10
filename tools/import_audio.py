@@ -8,11 +8,14 @@ parser, the noise filter) and is stored with its audio, so it shows up in the lo
 the copy pad and the trainer. --source is shown on the page as the recording's
 credit. --tries re-runs Whisper and keeps the best EAM copy, since the careful pass
 varies from run to run. With --eam-only, anything that doesn't parse as an EAM is
-skipped instead of stored.
+skipped instead of stored. --reference gives a trusted copy (say the source's own
+decode) that the trainer grades against instead of Skywatch's machine copy, which
+stays as Whisper heard it.
 """
 from __future__ import annotations
 
 import argparse
+import re
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -48,7 +51,11 @@ def load_audio(path: Path) -> np.ndarray:
 
 def import_recording(samples: np.ndarray, *, started_at: float, source: str, store: Store,
                      transcriber, cfg: Config = config, tries: int = 1,
-                     eam_only: bool = False) -> Imported:
+                     eam_only: bool = False, reference: Optional[str] = None) -> Imported:
+    if reference is not None:
+        reference = reference.strip().upper()
+        if not re.fullmatch(r"[A-Z0-9]+", reference):
+            raise ValueError(f"reference must be letters and digits only: {reference!r}")
     audio = samples.astype(np.float32) / 32768.0
     best = None
     for _ in range(max(1, tries)):
@@ -85,6 +92,7 @@ def import_recording(samples: np.ndarray, *, started_at: float, source: str, sto
         "words": [w.__dict__ for w in words] or None,
         "audio": fname,
         "source": f"import:{source}",    # the UI shows this as the recording's credit
+        "reference": reference,          # the trainer's answer key when set
     })
     return Imported(msg_id, parsed.kind, parsed.body)
 
@@ -97,16 +105,21 @@ def main(argv: Optional[list[str]] = None) -> int:
     ap.add_argument("--source", required=True, help="credit shown with the recording")
     ap.add_argument("--tries", type=int, default=1)
     ap.add_argument("--eam-only", action="store_true")
+    ap.add_argument("--reference", action="append",
+                    help="trusted copy the trainer grades against (repeat for several files)")
     args = ap.parse_args(argv)
     if len(args.at) != len(args.files):
         ap.error("give one --at per file")
+    if args.reference and len(args.reference) != len(args.files):
+        ap.error("give one --reference per file, or none")
 
     from app.transcriber import WhisperTranscriber   # heavy; only for real runs
     store, asr = Store(config.db_path), WhisperTranscriber(config)
-    for path, at in zip(args.files, args.at):
+    refs = args.reference or [None] * len(args.files)
+    for path, at, ref in zip(args.files, args.at, refs):
         started = datetime.fromisoformat(at.replace("Z", "+00:00")).timestamp()
         r = import_recording(load_audio(path), started_at=started, source=args.source, store=store,
-                             transcriber=asr, tries=args.tries, eam_only=args.eam_only)
+                             transcriber=asr, tries=args.tries, eam_only=args.eam_only, reference=ref)
         print(f"{path.name}: " + (f"stored #{r.id} {r.kind} {r.body or ''}" if r.id else f"skipped ({r.reason})"))
     return 0
 

@@ -64,3 +64,35 @@ def test_eam_only_skips_other_traffic_and_noise_is_never_stored(tmp_path, monkey
     r = run(cfg, store, Scripted(words("Thank you very much. Thank you.")))
     assert r.id is None and "noise" in r.reason
     assert store.list(["eam", "voice", "skyking"]) == []
+
+
+def test_reference_is_stored_beside_the_machine_copy(tmp_path, monkeypatch):
+    cfg, store = setup(tmp_path, monkeypatch)
+    r = run(cfg, store, Scripted(words(eam_text(BODY, BODY))), reference=" vq6jyq7 ")
+    m = store.get(r.id)
+    assert m["reference"] == "VQ6JYQ7" and m["body"] == BODY      # machine copy left as heard
+    plain = run(cfg, store, Scripted(words(eam_text(BODY, BODY))))
+    assert store.get(plain.id)["reference"] is None
+
+
+def test_reference_must_be_letters_and_digits(tmp_path, monkeypatch):
+    cfg, store = setup(tmp_path, monkeypatch)
+    try:
+        run(cfg, store, Scripted(words(eam_text(BODY, BODY))), reference="AB?C")
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("expected ValueError")
+    assert store.list(["eam"]) == []
+
+
+def test_old_databases_gain_the_reference_column(tmp_path):
+    import sqlite3
+    db = tmp_path / "old.db"
+    con = sqlite3.connect(db)
+    con.execute("CREATE TABLE messages (id INTEGER PRIMARY KEY, started_at REAL NOT NULL, "
+                "duration REAL NOT NULL, kind TEXT NOT NULL, body TEXT, audio TEXT NOT NULL)")
+    con.commit(); con.close()
+    Store(db)
+    cols = {r[1] for r in sqlite3.connect(db).execute("PRAGMA table_info(messages)")}
+    assert {"crowd_body", "reference"} <= cols

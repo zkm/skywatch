@@ -68,7 +68,10 @@ class Store:
         cols = {r["name"] for r in self._db.execute("PRAGMA table_info(messages)")}
         if "crowd_body" not in cols:     # databases created before crowd corrections
             self._db.execute("ALTER TABLE messages ADD COLUMN crowd_body TEXT")
-            self._db.commit()
+        if "reference" not in cols:      # trusted copy from an imported recording's source;
+                                         # the trainer grades against it when set
+            self._db.execute("ALTER TABLE messages ADD COLUMN reference TEXT")
+        self._db.commit()
         self._lock = threading.Lock()
 
     def insert(self, row: dict[str, Any]) -> int:

@@ -1,6 +1,7 @@
 "use strict";
 /* Copy trainer: play a real EAM recording, write it down, compare against the
-   reference copy (machine copy with listeners' corrections). Runs entirely in
+   reference copy: the source's own copy for imported recordings, otherwise the
+   machine copy with listeners' corrections. Runs entirely in
    the browser, so it works in the static demo too. */
 const trainer = { pool: null, msg: null, ref: "", checked: false };
 
@@ -23,13 +24,13 @@ async function trStart() {
 
 function trLoad(m) {
   trainer.msg = m;
-  trainer.ref = m.crowd_body || m.body;
+  trainer.ref = m.reference || m.crowd_body || m.body;
   trainer.checked = false;
   const p = $("tr-player");
   p.src = `audio/${m.audio}`;
   p.playbackRate = +$("tr-rate").value;
   $("tr-meta").textContent = `Recorded ${zTime(m.started_at)}${m.callsign ? ` from ${m.callsign}` : ""} · ${trainer.ref.length} characters`
-    + (credit(m) ? ` · ${credit(m)}` : "");
+    + (credit(m) ? ` · ${credit(m)}` : "") + (m.reference ? ", graded against its published copy" : "");
   const grid = $("tr-grid");
   grid.innerHTML = "";
   [...trainer.ref].forEach((_, i) => {
